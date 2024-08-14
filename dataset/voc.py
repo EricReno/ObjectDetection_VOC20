@@ -41,7 +41,7 @@ class VOCDataset(data.Dataset):
         image, target = self.load_image_target(index)
 
         image, target, deltas = self.transform(image, target, False)
-
+        
         return image, target, deltas
     
     def __len__(self):

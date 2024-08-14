@@ -9,9 +9,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Infer')
     parser.add_argument('--cuda', default=True, help='Weather use cuda.')
     
-    parser.add_argument('--onnx', default='yolo_v1.onnx', help='The onnx file which will be used.')
+    parser.add_argument('--onnx', default='yolo_v2.onnx', help='The onnx file which will be used.')
     parser.add_argument('--image_path', default='images', help='The root directory where data are stored')
-    parser.add_argument('--image_size', default = 640,    help='input image size')
+    parser.add_argument('--image_size', default = 416,    help='input image size')
     parser.add_argument('--confidece', default = 0.3,     help='The confidence threshold of predicted objects')
     parser.add_argument('--nms_thresh', default = 0.5,    help='NMS threshold')
     

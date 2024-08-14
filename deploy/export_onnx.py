@@ -2,13 +2,14 @@ import os
 import sys
 import onnx
 import torch
+import argparse
 sys.path.append('../')
-from config import parse_args
-from model.yolov1 import YOLOv1
+from model.yolov3 import Yolo_V2
 
-def export(input, model, pt_path, onnx_name):
+def export(input, model, pt_path, onnx_version):
     model.eval()
     model.deploy = True
+    model.trainable = False
 
     ckpt = os.getcwd().replace('deploy', pt_path)
     state_dict = torch.load(ckpt, map_location='cpu')
@@ -18,14 +19,14 @@ def export(input, model, pt_path, onnx_name):
         torch.onnx.export(
             model,
             input,
-            "yolo_v1.onnx",
+            onnx_version+".onnx",
             opset_version=11,
             input_names=['input'],
             output_names=['output'])
 
     # 添加中间层特征尺寸
-    onnx_model = onnx.load(onnx_name) 
-    onnx.save(onnx.shape_inference.infer_shapes(onnx_model), onnx_name)
+    onnx_model = onnx.load(onnx_version+".onnx") 
+    onnx.save(onnx.shape_inference.infer_shapes(onnx_model), onnx_version+".onnx")
 
     try: 
         onnx.checker.check_model(onnx_model) 
@@ -35,18 +36,30 @@ def export(input, model, pt_path, onnx_name):
         print("Model correct")
 
 if __name__ == "__main__":
-    version = "yolo_v1"
-    pt_path = "results/84.pth"
+    parser = argparse.ArgumentParser(description='Yolo v2')
+    parser.add_argument('--cuda',           default=False,  help='Weather use cuda.')
+    parser.add_argument('--batch_size',     default=1,      help='The batch size used by a single GPU during training')
+    parser.add_argument('--image_size',     default=416,    help='input image size')
+    parser.add_argument('--num_classes',    default=20,     help='The number of the classes')
+    parser.add_argument('--boxes_per_cell', default=5,      help='The number of the boxes in one cell')
+    parser.add_argument('--threshold_conf', default=0.3,    help='confidence threshold')
+    parser.add_argument('--threshold_nms',  default=0.5,    help='NMS threshold')
+    parser.add_argument('--classes_number', default=20,     help='The number of the classes')
 
-    args = parse_args()
+    args = parser.parse_args()
 
-    x = torch.randn(1, 3, 640, 640)
+    version = "yolo_v2"
+    pt_path = "log/0.pth"
+    device = torch.device('cpu')
 
-    if version == "yolo_v1":
-        model = YOLOv1(args = args, 
-               device = torch.device('cpu'),
-               trainable = False,
-               nms_thresh = args.nms_thresh,
-               conf_thresh = args.conf_thresh)
+    x = torch.randn(1, 3, 416, 416)
 
-    export(x, model, pt_path, version+".onnx")
+    model = Yolo_V2(device = device,
+            image_size=args.image_size,
+            nms_thresh=args.threshold_nms,
+            num_classes=args.classes_number,
+            conf_thresh = args.threshold_conf,
+            boxes_per_cell=args.boxes_per_cell
+            ).to(device)
+    
+    export(x, model, pt_path, version)
