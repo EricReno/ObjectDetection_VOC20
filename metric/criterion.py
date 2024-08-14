@@ -194,7 +194,6 @@ class Loss(object):
         # box loss
         pred_box_pos = pred_box[pos_masks]
         gt_bboxes_pos = gt_box[pos_masks]
-
         loss_box, ious = self.loss_bboxes(pred_box_pos, gt_bboxes_pos)
         loss_box = loss_box.sum() / num_fgs
 
