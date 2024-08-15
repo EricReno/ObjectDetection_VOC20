@@ -41,7 +41,7 @@ class VOCEvaluator():
         self.device = device
         self.data_dir = data_dir
         self.dataset = dataset
-        self.image_sets = image_sets[0],
+        self.image_sets = image_sets
         self.ovthresh = ovthresh
         self.class_names = class_names
         self.num_classes = len(class_names)
@@ -53,20 +53,24 @@ class VOCEvaluator():
                          ]
 
     def parse_rec(self, filename):
-        """ Parse a PASCAL VOC xml file """
-        tree = ET.parse(filename)
+        image_path = filename.replace('Annotations', 'JPEGImages').replace('.txt', '.jpeg')
+        image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        h, w = image.shape[:2]
+
         objects = []
-        for obj in tree.findall('object'):
-            obj_struct = {}
-            obj_struct['name'] = obj.find('name').text
-            obj_struct['pose'] = obj.find('pose').text
-            obj_struct['truncated'] = int(obj.find('truncated').text)
-            obj_struct['difficult'] = int(obj.find('difficult').text)
-            bbox = obj.find('bndbox')
-            obj_struct['bbox'] = [int(bbox.find('xmin').text),
-                                int(bbox.find('ymin').text),
-                                int(bbox.find('xmax').text),
-                                int(bbox.find('ymax').text)]
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                obj_struct = {}
+                line = line.strip().split()  # 去除首尾空格并按空格分割
+                line = [float(num) for num in line]  # 将字符串转换为浮点数
+
+                obj_struct['name'] = 'face'
+                obj_struct['difficult'] = 0
+                obj_struct['bbox'] = [int(line[1]*w - line[3]*w//2),
+                                    int(line[2]*h - line[4]*h//2),
+                                    int(line[1]*w + line[3]*w//2),
+                                    int(line[2]*h + line[4]*h//2)]
             objects.append(obj_struct)
 
         return objects
@@ -112,17 +116,17 @@ class VOCEvaluator():
             labels = outputs['labels']
             bboxes = outputs['bboxes']
 
-            if len(bboxes) == 0:
-                continue
-            else:
-                show_img, _ = self.dataset.pull_image(i)
-                for box in bboxes:
-                    cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
+            # if len(bboxes) == 0:
+            #     continue
+            # else:
+            #     show_img, _ = self.dataset.pull_image(i)
+            #     for box in bboxes:
+            #         cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
 
 
-                print(self.class_names[labels[0]], ":", scores)
-                cv2.imshow('1', show_img)
-                cv2.waitKey(0)
+            #     print(self.class_names[labels[0]], ":", scores)
+            #     cv2.imshow('1', show_img)
+            #     cv2.waitKey(0)
  
 
 
@@ -145,13 +149,13 @@ class VOCEvaluator():
         npos = 0
         gts = {}
 
-        self.imgsetpath = os.path.join(self.data_dir, 'VOC'+self.image_sets[0][0], 'ImageSets', 'Main', self.image_sets[0][1] + '.txt')
+        self.imgsetpath = os.path.join(self.data_dir, self.image_sets+'.txt')
         with open(self.imgsetpath, 'r') as f:
             lines = f.readlines()
         imagenames = [x.strip() for x in lines]
         
         for imagename in imagenames:
-            annopath = self.parse_rec(os.path.join(self.data_dir, 'VOC'+self.image_sets[0][0], 'Annotations', '%s.xml')%(imagename))
+            annopath = self.parse_rec(os.path.join(self.data_dir, 'Annotations', '%s.txt')%(imagename))
             bboxes = [ins for ins in annopath if ins['name'] == classname]
 
             bbox = np.array([x['bbox'] for x in bboxes])
