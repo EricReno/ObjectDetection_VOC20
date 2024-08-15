@@ -8,7 +8,7 @@ def parse_args():
                         help='Whether to use CUDA for GPU acceleration.')
     
     parser.add_argument('--worker_number',  
-                        default=4,
+                        default=6,
                         help='Number of logical processors.')
 
     parser.add_argument('--data_root',
@@ -33,11 +33,11 @@ def parse_args():
                         help="darknet53, darknet_tiny")
 
     parser.add_argument('--image_size',
-                        default=416,
+                        default=608,
                         help='Input image size')
     
     parser.add_argument('--batch_size',
-                        default=4,
+                        default=6,
                         help='Batch size used per GPU during training.')
     
     parser.add_argument('--class_names',
@@ -125,7 +125,7 @@ def parse_args():
                                                   [30, 61],[62, 45],[59, 119],    # P4
                                                   [116,90],[156,198],[373, 326]], help='confidence threshold')
     
-    parser.add_argument('--weight',         default='142.pth',                help='confidence threshold')
+    parser.add_argument('--weight',         default='0.pth',                help='confidence threshold')
 
 
     return parser.parse_args()

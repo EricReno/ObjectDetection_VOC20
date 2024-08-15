@@ -50,8 +50,6 @@ class FACEDataset(data.Dataset):
         
         anno, _ = self.pull_anno(index)
 
-        # guard against no boxes via resizing
-        anno = np.array(anno).reshape(-1, 5)
         target = {
             "boxes": anno[:, :4],
             "labels": anno[:, 4],
@@ -62,7 +60,6 @@ class FACEDataset(data.Dataset):
 
     def pull_image(self, index):
         img_id = self.ids[index]
-        label = self._annopath %img_id
         image = cv2.imread(self._imgpath % img_id, cv2.IMREAD_COLOR)
 
         return image, img_id
@@ -74,7 +71,6 @@ class FACEDataset(data.Dataset):
     
         h, w = image.shape[:2]
 
-
         anno = []
         with open(label, 'r') as f:
             lines = f.readlines()
@@ -83,11 +79,11 @@ class FACEDataset(data.Dataset):
                 line = line.strip().split()  # 去除首尾空格并按空格分割
                 line = [float(num) for num in line]  # 将字符串转换为浮点数
                 bndbox.append(line[1]*w - line[3]*w//2)
-                bndbox.append(line[2]*w - line[4]*w//2)
+                bndbox.append(line[2]*h - line[4]*h//2)
                 bndbox.append(line[1]*w + line[3]*w//2)
-                bndbox.append(line[2]*w + line[4]*w//2)
+                bndbox.append(line[2]*h + line[4]*h//2)
                 bndbox.append(line[0])
 
                 anno += bndbox
 
-        return anno, img_id
+        return np.array(anno).reshape(-1, 5), img_id

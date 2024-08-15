@@ -3,7 +3,7 @@ import time
 import torch
 import numpy
 from config import parse_args
-from eval import VOCEvaluator
+from eval import Evaluator
 from model.yolov3 import YOLOv3
 from metric.criterion import Loss
 from dataset.face import FACEDataset
@@ -67,7 +67,7 @@ def train():
                          loss_cls_weight = args.loss_cls_weight,
                          )
     
-    evaluator = VOCEvaluator(
+    evaluator = Evaluator(
         device   =device,
         data_dir = args.data_root,
         dataset  = val_dataset,
@@ -156,9 +156,7 @@ def train():
             with torch.no_grad():
                 mAP = evaluator.eval(model)
             writer.add_scalar('mAP', mAP, epoch)
-            print("Epoch [{}]".format('-'*100))
-            print("Epoch [{}:{}], mAP [{:.4f}]".format(epoch, args.epoch_max, mAP))
-            print("Epoch [{}]".format('-'*100))
+ 
             if mAP > max_mAP:
                 torch.save({'model': model.state_dict(),
                         'optimizer': optimizer.state_dict(),

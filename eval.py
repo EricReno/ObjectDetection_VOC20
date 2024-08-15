@@ -18,6 +18,10 @@ def rescale_bboxes(bboxes, origin_size, ratio):
     elif isinstance(ratio, List):
         bboxes[..., [0, 2]] /= ratio[0]
         bboxes[..., [1, 3]] /= ratio[1]
+        origin_size = [
+            origin_size[0]/ratio[0],
+            origin_size[1]/ratio[1]
+            ]
     else:
         raise NotImplementedError("ratio should be a int or List[int, int] type.")
 
@@ -27,7 +31,7 @@ def rescale_bboxes(bboxes, origin_size, ratio):
 
     return bboxes
 
-class VOCEvaluator():
+class Evaluator():
     """ VOC AP Evaluation class"""
     def __init__(self,
                  device,
@@ -102,7 +106,7 @@ class VOCEvaluator():
         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
         return ap
   
-    def inference(self, model, result_path):
+    def inference(self, model):
         for i in range(self.num_images):
             img, target, deltas = self.dataset.__getitem__(i)
             orig_h, orig_w = img.shape[1:]
@@ -115,20 +119,6 @@ class VOCEvaluator():
             scores = outputs['scores']
             labels = outputs['labels']
             bboxes = outputs['bboxes']
-
-            # if len(bboxes) == 0:
-            #     continue
-            # else:
-            #     show_img, _ = self.dataset.pull_image(i)
-            #     for box in bboxes:
-            #         cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
-
-
-            #     print(self.class_names[labels[0]], ":", scores)
-            #     cv2.imshow('1', show_img)
-            #     cv2.waitKey(0)
- 
-
 
             # rescale bboxes
             bboxes = rescale_bboxes(bboxes, [orig_w, orig_h], deltas)
@@ -190,8 +180,7 @@ class VOCEvaluator():
         }
 
     def eval(self, model):
-        result_path = os.path.join(os.getcwd(), 'log')
-        self.inference(model, result_path)
+        self.inference(model)
         print('\n~~~~~~~~')
         print('Results:')
 
@@ -306,7 +295,7 @@ if __name__ == "__main__":
     model.trainable = False
     model.eval()
     
-    evaluator = VOCEvaluator(
+    evaluator = Evaluator(
         device   =device,
         data_dir = args.data_root,
         dataset  = val_dataset,
