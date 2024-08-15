@@ -4,6 +4,7 @@ import torch
 import argparse
 import numpy as np
 from typing import List
+from config import parse_args
 from model.yolov3 import YOLOv3
 
 import xml.etree.ElementTree as ET
@@ -269,29 +270,7 @@ class VOCEvaluator():
         return self.map
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Eval')
-    parser.add_argument('--cuda',           default=True,                   help='Weather use cuda.')
-    parser.add_argument('--image_size',     default=416,                    help='Input image size')
-    parser.add_argument('--data_root',      default='/data/VOCdevkit',   help='The path where the dataset is stored')
-    parser.add_argument('--data_augment',   default=['RandomSaturationHue', 'RandomContrast', 'RandomBrightness', 'RandomSampleCrop', 'RandomExpand', 
-                           'RandomHorizontalFlip'],                         help="[RandomExpand,RandomCenterCropPad,RandomCenterCropPad, RandomBrightness], default Resize")
-    parser.add_argument('--datasets_val',   default=[('2007', 'test')],     help='The data set to be tested')
-    parser.add_argument('--class_names',    default= ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 'person', 'pottedplant', 
-                           'sheep', 'sofa', 'train', 'tvmonitor'],          help='The category of predictions that the model can cover')
-    parser.add_argument('--classes_number', default=20,                     help='The number of the classes')
-    parser.add_argument('--boxes_per_cell', default=3,                      help='The number of the boxes in one cell')
-    parser.add_argument('--threshold_nms',  default=0.5,                    help='NMS threshold')
-    parser.add_argument('--threshold_conf', default=0.3,                    help='confidence threshold')
-    parser.add_argument('--threshold_over', default=0.5,                    help='confidence threshold')
-    parser.add_argument('--threshold_recall', default=101,                  help='The threshold for recall')
-
-    parser.add_argument('--weight',         default='88.pth',                help='confidence threshold')
-    parser.add_argument('--anchor_size', default=[[10,13],[16,30],[33,23],     # P3
-                                                  [30, 61],[62, 45],[59, 119],    # P4
-                                                  [116,90],[156,198],[373, 326]], help='confidence threshold')
-
-
-    args = parser.parse_args()
+    args = parse_args()
 
     if args.cuda and torch.cuda.is_available():
         device = torch.device('cuda')
@@ -305,6 +284,7 @@ if __name__ == "__main__":
                              is_train     = False)
 
     model = YOLOv3(device  =device,
+                   backbone = args.backbone,
                    image_size   =args.image_size,
                    nms_thresh   =args.threshold_nms,
                    anchor_size = args.anchor_size,
@@ -325,7 +305,7 @@ if __name__ == "__main__":
         data_dir = args.data_root,
         dataset  = val_dataset,
         image_sets = args.datasets_val,
-        ovthresh    = args.threshold_over,                        
+        ovthresh    = args.threshold_nms,                        
         class_names = args.class_names,
         recall_thre = args.threshold_recall,
         )
