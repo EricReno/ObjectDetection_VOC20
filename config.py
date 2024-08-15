@@ -8,19 +8,19 @@ def parse_args():
                         help='Whether to use CUDA for GPU acceleration.')
     
     parser.add_argument('--worker_number',  
-                        default=32,
+                        default=4,
                         help='Number of logical processors.')
 
     parser.add_argument('--data_root',
-                        default='/data/VOCdevkit',
+                        default='/data/FireDetection',
                         help='Root directory where the dataset is stored.')
     
     parser.add_argument('--datasets_val',
-                        default=[('2007', 'test')],
+                        default='val',
                         help='Dataset split used for validation.')
     
     parser.add_argument('--datasets_train',
-                        default=[('2007', 'trainval'), ('2012', 'trainval')], 
+                        default='train', 
                         help='Datasets used for training.')
     
     parser.add_argument('--data_augment',
@@ -41,12 +41,11 @@ def parse_args():
                         help='Batch size used per GPU during training.')
     
     parser.add_argument('--class_names',
-                        default= ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 
-                                  'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'],          
+                        default= ['fire', 'smoke'],          
                         help='List of classes the model predicts.')
     
     parser.add_argument('--classes_number',
-                        default=20,
+                        default=2,
                         help='Number of classes.')
     
 
@@ -125,5 +124,8 @@ def parse_args():
     parser.add_argument('--anchor_size', default=[[10,13],[16,30],[33,23],     # P3
                                                   [30, 61],[62, 45],[59, 119],    # P4
                                                   [116,90],[156,198],[373, 326]], help='confidence threshold')
+    
+    parser.add_argument('--weight',         default='142.pth',                help='confidence threshold')
+
 
     return parser.parse_args()

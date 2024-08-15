@@ -122,16 +122,6 @@ def train():
                   epoch, args.epoch_max, iteration+1, len(train_dataloader), optimizer.param_groups[0]['lr'], losses, loss_obj, loss_cls, loss_box))
             train_loss += losses.item() * images.size(0)
         
-        weight = '{}.pth'.format(epoch)
-        ckpt_path = os.path.join(os.getcwd(), 'log', weight)
-        if not os.path.exists(os.path.dirname(ckpt_path)): 
-            os.makedirs(os.path.dirname(ckpt_path))
-        torch.save({'model': model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'epoch': epoch,
-                    'args': args},
-                    ckpt_path)
-        
         train_loss /= len(train_dataloader.dataset)
         writer.add_scalar('Loss/Train', train_loss, epoch)
 
