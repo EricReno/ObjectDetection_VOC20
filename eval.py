@@ -8,7 +8,7 @@ from config import parse_args
 from model.yolov3 import YOLOv3
 
 import xml.etree.ElementTree as ET
-from dataset.fire import FIREDataset
+from dataset.face import FACEDataset
 from dataset.augment import Augmentation
 
 def rescale_bboxes(bboxes, origin_size, ratio):
@@ -278,10 +278,12 @@ if __name__ == "__main__":
         device = torch.device('cpu')
 
     val_trans = Augmentation(args.image_size, args.data_augment, is_train=False)
-    val_dataset = FIREDataset(data_dir     = args.data_root,
+    val_dataset = FACEDataset(data_dir     = args.data_root,
                              image_sets   = args.datasets_val,
                              transform    = val_trans,
-                             is_train     = False)
+                             is_train     = False,
+                             classnames = args.class_names
+                             )
 
     model = YOLOv3(device  =device,
                    backbone = args.backbone,

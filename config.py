@@ -12,7 +12,7 @@ def parse_args():
                         help='Number of logical processors.')
 
     parser.add_argument('--data_root',
-                        default='/data/FireDetection',
+                        default='/data/FaceDetection',
                         help='Root directory where the dataset is stored.')
     
     parser.add_argument('--datasets_val',
@@ -24,7 +24,7 @@ def parse_args():
                         help='Datasets used for training.')
     
     parser.add_argument('--data_augment',
-                        default=['RandomSaturationHue', 'RandomContrast', 'RandomBrightness', 'RandomSampleCrop', 'RandomExpand', 'RandomHorizontalFlip'],
+                        default=['RandomSaturationHue', 'RandomContrast', 'RandomBrightness', 'RandomExpand', 'RandomHorizontalFlip'],
                         # default=['RandomSaturationHue', 'RandomContrast', 'RandomBrightness', 'RandomSampleCrop', 'RandomExpand', 'RandomHorizontalFlip']
                         help='List of data augmentation techniques applied during training.')
     
@@ -37,15 +37,15 @@ def parse_args():
                         help='Input image size')
     
     parser.add_argument('--batch_size',
-                        default=64,
+                        default=4,
                         help='Batch size used per GPU during training.')
     
     parser.add_argument('--class_names',
-                        default= ['fire', 'smoke'],          
+                        default= ['face'],          
                         help='List of classes the model predicts.')
     
     parser.add_argument('--classes_number',
-                        default=2,
+                        default=1,
                         help='Number of classes.')
     
 
