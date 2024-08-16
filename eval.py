@@ -1,7 +1,6 @@
 import os
 import cv2
 import torch
-import argparse
 import numpy as np
 from typing import List
 from config import parse_args
@@ -115,13 +114,31 @@ class Evaluator():
             img = img.unsqueeze(0).to(self.device)
 
             # forward
+            import time
+            start = time.time()
             outputs = model(img)
+            end = time.time()
+
+            print('infer:', end-start)
+
             scores = outputs['scores']
             labels = outputs['labels']
             bboxes = outputs['bboxes']
 
             # rescale bboxes
             bboxes = rescale_bboxes(bboxes, [orig_w, orig_h], deltas)
+
+            # if len(bboxes) == 0:
+            #     continue
+            # else:
+            #     show_img, _ = self.dataset.pull_image(i)
+            #     for box in bboxes:
+            #         cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
+
+
+            #     print(self.class_names[labels[0]], ":", scores)
+            #     cv2.imshow('1', show_img)
+            #     cv2.waitKey(0)
 
             for j in range(self.num_classes):
                 inds = np.where(labels == j)[0]
@@ -267,6 +284,7 @@ if __name__ == "__main__":
 
     if args.cuda and torch.cuda.is_available():
         device = torch.device('cuda')
+        print('use cuda')
     else:
         device = torch.device('cpu')
 

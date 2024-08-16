@@ -9,36 +9,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Infer')
     parser.add_argument('--cuda', default=True, help='Weather use cuda.')
     
-    parser.add_argument('--onnx', default='yolo_v2.onnx', help='The onnx file which will be used.')
-    parser.add_argument('--image_path', default='images', help='The root directory where data are stored')
-    parser.add_argument('--image_size', default = 416,    help='input image size')
+    parser.add_argument('--onnx', default='yolo_v3.onnx', help='The onnx file which will be used.')
+    parser.add_argument('--image_path', default='E:\\data\\FaceDetection\\JPEGImages', help='The root directory where data are stored')
+    parser.add_argument('--image_size', default = 608,    help='input image size')
     parser.add_argument('--confidece', default = 0.3,     help='The confidence threshold of predicted objects')
     parser.add_argument('--nms_thresh', default = 0.5,    help='NMS threshold')
     
-    parser.add_argument('--class_names', default= ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 
-                           'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 
-                           'sofa', 'train', 'tvmonitor'], help= 'The category of predictions that the model can cover')
+    parser.add_argument('--class_names', default= ['face'], help= 'The category of predictions that the model can cover')
     parser.add_argument('--class_colors', default= {
-                                                    'aeroplane': (255, 0, 0),       # 蓝色
-                                                    'bicycle': (0, 255, 0),         # 绿色
-                                                    'bird': (0, 0, 255),            # 红色
-                                                    'boat': (255, 255, 0),          # 青色
-                                                    'bottle': (255, 0, 255),        # 洋红
-                                                    'bus': (0, 255, 255),           # 黄色
-                                                    'car': (128, 0, 128),           # 紫色
-                                                    'cat': (0, 128, 128),           # 深绿色
-                                                    'chair': (128, 128, 0),         # 橄榄绿
-                                                    'cow': (64, 64, 64),            # 灰色
-                                                    'diningtable': (0, 64, 128),    # 深蓝色
-                                                    'dog': (128, 64, 0),            # 棕色
-                                                    'horse': (0, 128, 64),          # 暗绿色
-                                                    'motorbike': (128, 128, 255),   # 浅蓝色
-                                                    'person': (64, 0, 64),          # 紫红色
-                                                    'pottedplant': (128, 0, 0),     # 深红色
-                                                    'sheep': (0, 128, 255),         # 天蓝色
-                                                    'sofa': (128, 255, 128),        # 浅绿色
-                                                    'train': (255, 128, 0),         # 橙色
-                                                    'tvmonitor': (64, 255, 64)      # 浅绿色
+                                                    'face': (255, 0, 0),       # 蓝色
                                                 }, help= 'The category of predictions that the model can cover')
     return parser.parse_args()
 
@@ -87,23 +66,18 @@ def preinfer(image_path, image_size):
 
     return  image, output, ratio
 
-def infer(input, onnx, cuda):
+def infer(input, session):
+
+    
     start = time.time()
 
-    if cuda:
-        providers = [('CUDAExecutionProvider', {
-            'device_id': 0
-        })]
-    else:
-        providers = [('CPUExecutionProvider', {})]
-    
-    session = onnxruntime.InferenceSession(onnx, providers=providers)
-    
     output = session.run(['output'], {'input': input})
 
-    end = time.time() - start
-    print(end)
-    print("Inference time (Hz):", 1 / end)
+    end = time.time() 
+    print(end- start)
+    print("Inference time (Hz):", 1 / (end- start))
+
+   
 
     return output
 
@@ -146,6 +120,21 @@ def postinfer(input, ratio, image_size, class_names, conf_thresh, nms_thresh):
 if __name__ == "__main__":
     args = parse_args()
 
+    if args.cuda:
+        providers = [('CUDAExecutionProvider', {
+            'device_id': 0
+        })]
+    else:
+        providers = [('CPUExecutionProvider', {})]
+
+    # session_options = onnxruntime.SessionOptions()
+    # session_options.enable_profiling = True
+
+    session = onnxruntime.InferenceSession(args.onnx, providers=providers)
+
+
+
+
     images_list = [os.path.join(os.path.abspath(args.image_path), _) for _ in os.listdir(args.image_path)]
     for image in images_list:
 
@@ -154,7 +143,9 @@ if __name__ == "__main__":
         image, infer_input, ratio = preinfer(image, args.image_size)
 
         ## TODO TWO
-        postinfer_input = infer(infer_input, args.onnx, args.cuda) # 400*(4+20)
+        postinfer_input = infer(infer_input, session) # 400*(4+20)
+        # profiling_file = session.end_profiling()
+        # print(f"Profiling file saved at: {profiling_file}")
 
         ## TODO THREE
         labels, scores, bboxes = postinfer(postinfer_input, ratio, args.image_size, 
@@ -181,8 +172,8 @@ if __name__ == "__main__":
             cv2.rectangle(image, (0, 0), (w, h), (255, 255, 255), -1) 
             cv2.putText(image, text, (0, h), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 0), 1)
 
-        cv2.imshow('image', image)
+        # cv2.imshow('image', image)
 
-        # 退出循环的按键（通常是'q'键）  
-        if cv2.waitKey(0) == ord('q'):  
-            break
+        # # 退出循环的按键（通常是'q'键）  
+        # if cv2.waitKey(0) == ord('q'):  
+        #     break

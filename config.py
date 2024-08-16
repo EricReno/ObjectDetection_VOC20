@@ -114,7 +114,7 @@ def parse_args():
                         help='Threshold for non-maximum suppression (NMS).')
     
     parser.add_argument('--threshold_conf',
-                        default=0.3,
+                        default=0.2,
                         help='Confidence threshold for filtering detections.')
     
     parser.add_argument('--threshold_recall',
@@ -125,7 +125,7 @@ def parse_args():
                                                   [30, 61],[62, 45],[59, 119],    # P4
                                                   [116,90],[156,198],[373, 326]], help='confidence threshold')
     
-    parser.add_argument('--weight',         default='0.pth',                help='confidence threshold')
+    parser.add_argument('--weight',         default='151.pth',                help='confidence threshold')
 
 
     return parser.parse_args()

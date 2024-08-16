@@ -258,9 +258,14 @@ class YOLOv3(nn.Module):
             all_anchors.append(anchors)
 
         if self.deploy:
+            obj_preds = torch.cat(all_obj_preds, dim=0)
+            cls_preds = torch.cat(all_cls_preds, dim=0)
+            box_preds = torch.cat(all_box_preds, dim=0)
+            scores = torch.sqrt(obj_preds.sigmoid() * cls_preds.sigmoid())
+            bboxes = box_preds
             # [n_anchors_all, 4 + C]
             outputs = torch.cat([bboxes, scores], dim=-1)
-            return outputs
+
         else:
             bboxes, scores, labels = self.postprocess(
                 all_obj_preds, all_cls_preds, all_box_preds)
