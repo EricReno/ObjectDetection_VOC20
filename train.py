@@ -6,7 +6,7 @@ from config import parse_args
 from eval import VOCEvaluator
 from model.yolov3 import YOLOv3
 from metric.criterion import Loss
-from dataset.voc import VOCDataset
+from dataset.garbage import GARBAGEDataset
 from dataset.utils import CollateFunc
 from dataset.augment import Augmentation
 from torch.utils.tensorboard import SummaryWriter
@@ -26,20 +26,22 @@ def train():
 
     # ---------------------------- Build Datasets ----------------------------
     val_trans = Augmentation(args.image_size, args.data_augment, is_train=False)
-    val_dataset = VOCDataset(data_dir     = args.data_root,
+    val_dataset = GARBAGEDataset(data_dir     = args.data_root,
                              image_sets   = args.datasets_val,
                              transform    = val_trans,
-                             is_train     = False)
+                             is_train     = False,
+                             class_name= args.class_names)
     val_sampler = torch.utils.data.RandomSampler(val_dataset)
     val_b_sampler = torch.utils.data.BatchSampler(val_sampler, args.batch_size, drop_last=True)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_sampler=val_b_sampler, collate_fn=CollateFunc(), num_workers=args.worker_number, pin_memory=True)
     
     train_trans = Augmentation(args.image_size, args.data_augment, is_train=True)
-    train_dataset = VOCDataset(img_size   = args.image_size,
+    train_dataset = GARBAGEDataset(img_size   = args.image_size,
                                data_dir   = args.data_root,
                                image_sets = args.datasets_train,
                                transform  = train_trans,
-                               is_train   = True)
+                               is_train   = True,
+                               class_name= args.class_names)
     train_sampler = torch.utils.data.RandomSampler(train_dataset)
     train_b_sampler = torch.utils.data.BatchSampler(train_sampler, args.batch_size, drop_last=True)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_b_sampler, collate_fn=CollateFunc(), num_workers=args.worker_number, pin_memory=True)

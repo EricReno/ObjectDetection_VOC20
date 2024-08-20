@@ -8,7 +8,7 @@ from config import parse_args
 from model.yolov3 import YOLOv3
 
 import xml.etree.ElementTree as ET
-from dataset.fire import FIREDataset
+from dataset.garbage import GARBAGEDataset
 from dataset.augment import Augmentation
 
 def rescale_bboxes(bboxes, origin_size, ratio):
@@ -18,6 +18,10 @@ def rescale_bboxes(bboxes, origin_size, ratio):
     elif isinstance(ratio, List):
         bboxes[..., [0, 2]] /= ratio[0]
         bboxes[..., [1, 3]] /= ratio[1]
+        origin_size = [
+            origin_size[0]/ratio[0],
+            origin_size[1]/ratio[1]
+            ]
     else:
         raise NotImplementedError("ratio should be a int or List[int, int] type.")
 
@@ -41,7 +45,7 @@ class VOCEvaluator():
         self.device = device
         self.data_dir = data_dir
         self.dataset = dataset
-        self.image_sets = image_sets[0],
+        self.image_sets = image_sets
         self.ovthresh = ovthresh
         self.class_names = class_names
         self.num_classes = len(class_names)
@@ -112,22 +116,20 @@ class VOCEvaluator():
             labels = outputs['labels']
             bboxes = outputs['bboxes']
 
-            if len(bboxes) == 0:
-                continue
-            else:
-                show_img, _ = self.dataset.pull_image(i)
-                for box in bboxes:
-                    cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
-
-
-                print(self.class_names[labels[0]], ":", scores)
-                cv2.imshow('1', show_img)
-                cv2.waitKey(0)
- 
-
-
             # rescale bboxes
             bboxes = rescale_bboxes(bboxes, [orig_w, orig_h], deltas)
+
+            # if len(bboxes) == 0:
+            #     continue
+            # else:
+            #     show_img, _ = self.dataset.pull_image(i)
+            #     for box in bboxes:
+            #         cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
+
+
+            #     print(self.class_names[labels[0]], ":", scores)
+            #     cv2.imshow('1', show_img)
+            #     cv2.waitKey(0)
 
             for j in range(self.num_classes):
                 inds = np.where(labels == j)[0]
@@ -145,13 +147,13 @@ class VOCEvaluator():
         npos = 0
         gts = {}
 
-        self.imgsetpath = os.path.join(self.data_dir, 'VOC'+self.image_sets[0][0], 'ImageSets', 'Main', self.image_sets[0][1] + '.txt')
+        self.imgsetpath = os.path.join(self.data_dir, self.image_sets+'.txt')
         with open(self.imgsetpath, 'r') as f:
             lines = f.readlines()
         imagenames = [x.strip() for x in lines]
         
         for imagename in imagenames:
-            annopath = self.parse_rec(os.path.join(self.data_dir, 'VOC'+self.image_sets[0][0], 'Annotations', '%s.xml')%(imagename))
+            annopath = self.parse_rec(os.path.join(self.data_dir, 'Annotations', '%s.xml')%(imagename))
             bboxes = [ins for ins in annopath if ins['name'] == classname]
 
             bbox = np.array([x['bbox'] for x in bboxes])
@@ -278,10 +280,12 @@ if __name__ == "__main__":
         device = torch.device('cpu')
 
     val_trans = Augmentation(args.image_size, args.data_augment, is_train=False)
-    val_dataset = FIREDataset(data_dir     = args.data_root,
+    val_dataset = GARBAGEDataset(data_dir     = args.data_root,
                              image_sets   = args.datasets_val,
                              transform    = val_trans,
-                             is_train     = False)
+                             is_train     = False,
+                             class_name= args.class_names)
+
 
     model = YOLOv3(device  =device,
                    backbone = args.backbone,

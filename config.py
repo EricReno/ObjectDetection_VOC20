@@ -12,7 +12,7 @@ def parse_args():
                         help='Number of logical processors.')
 
     parser.add_argument('--data_root',
-                        default='/data/FireDetection',
+                        default='/data/GarbageDetection',
                         help='Root directory where the dataset is stored.')
     
     parser.add_argument('--datasets_val',
@@ -37,15 +37,15 @@ def parse_args():
                         help='Input image size')
     
     parser.add_argument('--batch_size',
-                        default=64,
+                        default=4,
                         help='Batch size used per GPU during training.')
     
     parser.add_argument('--class_names',
-                        default= ['fire', 'smoke'],          
+                        default= ['garbage',  'garbage_bin',  'overflow' ],          
                         help='List of classes the model predicts.')
     
     parser.add_argument('--classes_number',
-                        default=2,
+                        default=3,
                         help='Number of classes.')
     
 
@@ -125,7 +125,7 @@ def parse_args():
                                                   [30, 61],[62, 45],[59, 119],    # P4
                                                   [116,90],[156,198],[373, 326]], help='confidence threshold')
     
-    parser.add_argument('--weight',         default='142.pth',                help='confidence threshold')
+    parser.add_argument('--weight',         default='152.pth',                help='confidence threshold')
 
 
     return parser.parse_args()

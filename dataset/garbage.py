@@ -5,15 +5,16 @@ import torch.utils.data as data
 import xml.etree.ElementTree as ET
 
 # FIRE class names
-FIRE_CLASSES = ('fire', 'smoke')
+# FIRE_CLASSES = ('fire', 'smoke')
 
-class FIREDataset(data.Dataset):
+class GARBAGEDataset(data.Dataset):
     def __init__(self,
                  img_size :int = 640,
                  data_dir :str = None, 
                  image_sets = 'train',
                  transform = None,
-                 is_train :bool = False) -> None:
+                 is_train :bool = False,
+                 class_name :bool = None) -> None:
         super().__init__()
 
         self.root = os.path.join(os.getcwd(), data_dir)
@@ -29,7 +30,7 @@ class FIREDataset(data.Dataset):
             self.ids.append((self.root, line.strip()))
         self.dataset_size = len(self.ids)
 
-        self.class_to_ind = dict(zip(FIRE_CLASSES, range(len(FIRE_CLASSES))))
+        self.class_to_ind = dict(zip(class_name, range(len(class_name))))
 
         self.transform = transform
 
