@@ -125,7 +125,7 @@ def parse_args():
                                                   [30, 61],[62, 45],[59, 119],    # P4
                                                   [116,90],[156,198],[373, 326]], help='confidence threshold')
     
-    parser.add_argument('--weight',         default='142.pth',                help='confidence threshold')
+    parser.add_argument('--weight',         default='148.pth',                help='confidence threshold')
 
 
     return parser.parse_args()

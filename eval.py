@@ -18,6 +18,10 @@ def rescale_bboxes(bboxes, origin_size, ratio):
     elif isinstance(ratio, List):
         bboxes[..., [0, 2]] /= ratio[0]
         bboxes[..., [1, 3]] /= ratio[1]
+        origin_size = [
+            origin_size[0]/ratio[0],
+            origin_size[1]/ratio[1]
+            ]
     else:
         raise NotImplementedError("ratio should be a int or List[int, int] type.")
 
@@ -41,7 +45,7 @@ class VOCEvaluator():
         self.device = device
         self.data_dir = data_dir
         self.dataset = dataset
-        self.image_sets = image_sets[0],
+        self.image_sets = image_sets
         self.ovthresh = ovthresh
         self.class_names = class_names
         self.num_classes = len(class_names)
@@ -112,17 +116,35 @@ class VOCEvaluator():
             labels = outputs['labels']
             bboxes = outputs['bboxes']
 
-            if len(bboxes) == 0:
-                continue
-            else:
-                show_img, _ = self.dataset.pull_image(i)
-                for box in bboxes:
-                    cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
+            # if len(bboxes) == 0:
+            #     continue
+            # else:
+            #     show_img, _ = self.dataset.pull_image(i)
+            #     for index, box in enumerate(bboxes):
+            #         cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
+
+            #         class_colors = {
+            #                                         'smoke': (255, 0, 0),       # 蓝色
+            #                                         'fire': (0, 0, 255),            # 红色
+            #                                     }
+                    
+            #         ind_to_cls = {
+            #             0: 'fire',
+            #             1: 'smoke'
+            #         }
 
 
-                print(self.class_names[labels[0]], ":", scores)
-                cv2.imshow('1', show_img)
-                cv2.waitKey(0)
+            #         label_name = ind_to_cls[labels[index]]
+            #         score = scores[index]
+            #         text = "%s:%s"%(label_name, str(round(float(score), 2)))
+            #         (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
+            #         cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[0]) + w, int(box[1]) + h), class_colors[label_name], -1) 
+            #         cv2.putText(show_img, text, (int(box[0]), int(box[1])+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+                    
+
+            #     print(self.class_names[labels[0]], ":", scores)
+            #     cv2.imshow('1', show_img)
+            #     cv2.waitKey(0)
  
 
 
@@ -145,7 +167,7 @@ class VOCEvaluator():
         npos = 0
         gts = {}
 
-        self.imgsetpath = os.path.join(self.data_dir, 'VOC'+self.image_sets[0][0], 'ImageSets', 'Main', self.image_sets[0][1] + '.txt')
+        self.imgsetpath = os.path.join(self.data_dir, self.image_sets+'.txt')
         with open(self.imgsetpath, 'r') as f:
             lines = f.readlines()
         imagenames = [x.strip() for x in lines]
@@ -187,14 +209,14 @@ class VOCEvaluator():
 
     def eval(self, model):
         result_path = os.path.join(os.getcwd(), 'log')
-        self.inference(model, result_path)
+        # self.inference(model, result_path)
         print('\n~~~~~~~~')
         print('Results:')
 
         aps = []
         
         for cls_ind, cls_name in enumerate(self.class_names):
-            dets = self.load_dets(cls_name)
+            # dets = self.load_dets(cls_name)
             gts, npos = self.load_gt(cls_name)
 
             if len(dets['bboxes']):
@@ -271,6 +293,7 @@ class VOCEvaluator():
 
 if __name__ == "__main__":
     args = parse_args()
+    
 
     if args.cuda and torch.cuda.is_available():
         device = torch.device('cuda')
