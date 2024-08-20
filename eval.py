@@ -31,7 +31,7 @@ def rescale_bboxes(bboxes, origin_size, ratio):
 
     return bboxes
 
-class VOCEvaluator():
+class Evaluator():
     """ VOC AP Evaluation class"""
     def __init__(self,
                  device,
@@ -116,40 +116,37 @@ class VOCEvaluator():
             labels = outputs['labels']
             bboxes = outputs['bboxes']
 
-            # if len(bboxes) == 0:
-            #     continue
-            # else:
-            #     show_img, _ = self.dataset.pull_image(i)
-            #     for index, box in enumerate(bboxes):
-            #         cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
-
-            #         class_colors = {
-            #                                         'smoke': (255, 0, 0),       # 蓝色
-            #                                         'fire': (0, 0, 255),            # 红色
-            #                                     }
-                    
-            #         ind_to_cls = {
-            #             0: 'fire',
-            #             1: 'smoke'
-            #         }
-
-
-            #         label_name = ind_to_cls[labels[index]]
-            #         score = scores[index]
-            #         text = "%s:%s"%(label_name, str(round(float(score), 2)))
-            #         (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
-            #         cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[0]) + w, int(box[1]) + h), class_colors[label_name], -1) 
-            #         cv2.putText(show_img, text, (int(box[0]), int(box[1])+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
-                    
-
-            #     print(self.class_names[labels[0]], ":", scores)
-            #     cv2.imshow('1', show_img)
-            #     cv2.waitKey(0)
- 
-
-
             # rescale bboxes
             bboxes = rescale_bboxes(bboxes, [orig_w, orig_h], deltas)
+
+            if len(bboxes) == 0:
+                continue
+            else:
+                show_img, _ = self.dataset.pull_image(i)
+                for index, box in enumerate(bboxes):
+                    cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
+
+                    class_colors = {
+                                                    'smoke': (255, 0, 0),       # 蓝色
+                                                    'fire': (0, 0, 255),            # 红色
+                                                }
+                    
+                    ind_to_cls = {
+                        0: 'fire',
+                        1: 'smoke'
+                    }
+
+                    label_name = ind_to_cls[labels[index]]
+                    score = scores[index]
+                    text = "%s:%s"%(label_name, str(round(float(score), 2)))
+                    (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
+                    cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[0]) + w, int(box[1]) + h), class_colors[label_name], -1) 
+                    cv2.putText(show_img, text, (int(box[0]), int(box[1])+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+                    
+
+                print(self.class_names[labels[0]], ":", scores)
+                cv2.imshow('1', show_img)
+                cv2.waitKey(0)
 
             for j in range(self.num_classes):
                 inds = np.where(labels == j)[0]
@@ -173,7 +170,7 @@ class VOCEvaluator():
         imagenames = [x.strip() for x in lines]
         
         for imagename in imagenames:
-            annopath = self.parse_rec(os.path.join(self.data_dir, 'VOC'+self.image_sets[0][0], 'Annotations', '%s.xml')%(imagename))
+            annopath = self.parse_rec(os.path.join(self.data_dir, 'Annotations', '%s.xml')%(imagename))
             bboxes = [ins for ins in annopath if ins['name'] == classname]
 
             bbox = np.array([x['bbox'] for x in bboxes])
@@ -209,14 +206,14 @@ class VOCEvaluator():
 
     def eval(self, model):
         result_path = os.path.join(os.getcwd(), 'log')
-        # self.inference(model, result_path)
+        self.inference(model, result_path)
         print('\n~~~~~~~~')
         print('Results:')
 
         aps = []
         
         for cls_ind, cls_name in enumerate(self.class_names):
-            # dets = self.load_dets(cls_name)
+            dets = self.load_dets(cls_name)
             gts, npos = self.load_gt(cls_name)
 
             if len(dets['bboxes']):
@@ -323,7 +320,7 @@ if __name__ == "__main__":
     model.trainable = False
     model.eval()
     
-    evaluator = VOCEvaluator(
+    evaluator = Evaluator(
         device   =device,
         data_dir = args.data_root,
         dataset  = val_dataset,
