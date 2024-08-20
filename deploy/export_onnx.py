@@ -4,7 +4,8 @@ import onnx
 import torch
 import argparse
 sys.path.append('../')
-from model.yolov3 import Yolo_V2
+from config import parse_args
+from model.yolov3 import YOLOv3
 
 def export(input, model, pt_path, onnx_version):
     model.eval()
@@ -12,7 +13,7 @@ def export(input, model, pt_path, onnx_version):
     model.trainable = False
 
     ckpt = os.getcwd().replace('deploy', pt_path)
-    state_dict = torch.load(ckpt, map_location='cpu')
+    state_dict = torch.load(ckpt, map_location='cpu', weights_only=False)
     model.load_state_dict(state_dict["model"])
 
     with torch.no_grad():
@@ -36,30 +37,22 @@ def export(input, model, pt_path, onnx_version):
         print("Model correct")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Yolo v2')
-    parser.add_argument('--cuda',           default=False,  help='Weather use cuda.')
-    parser.add_argument('--batch_size',     default=1,      help='The batch size used by a single GPU during training')
-    parser.add_argument('--image_size',     default=416,    help='input image size')
-    parser.add_argument('--num_classes',    default=20,     help='The number of the classes')
-    parser.add_argument('--boxes_per_cell', default=5,      help='The number of the boxes in one cell')
-    parser.add_argument('--threshold_conf', default=0.3,    help='confidence threshold')
-    parser.add_argument('--threshold_nms',  default=0.5,    help='NMS threshold')
-    parser.add_argument('--classes_number', default=20,     help='The number of the classes')
+    args = parse_args()
 
-    args = parser.parse_args()
-
-    version = "yolo_v2"
-    pt_path = "log/0.pth"
+    version = "yolo_v3"
+    pt_path = "log/152.pth"
     device = torch.device('cpu')
 
-    x = torch.randn(1, 3, 416, 416)
+    x = torch.randn(1, 3, 608, 608)
 
-    model = Yolo_V2(device = device,
-            image_size=args.image_size,
-            nms_thresh=args.threshold_nms,
-            num_classes=args.classes_number,
-            conf_thresh = args.threshold_conf,
-            boxes_per_cell=args.boxes_per_cell
-            ).to(device)
+    model = YOLOv3(device = device,
+                   backbone = args.backbone,
+                   image_size=args.image_size,
+                   nms_thresh=args.threshold_nms,
+                   anchor_size = args.anchor_size,
+                   num_classes=args.classes_number,
+                   conf_thresh = args.threshold_conf,
+                   boxes_per_cell=args.boxes_per_cell
+                   ).to(device)
     
     export(x, model, pt_path, version)

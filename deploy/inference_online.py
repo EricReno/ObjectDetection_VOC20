@@ -9,36 +9,18 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Infer')
     parser.add_argument('--cuda', default=True, help='Weather use cuda.')
     
-    parser.add_argument('--onnx', default='yolo_v2.onnx', help='The onnx file which will be used.')
+    parser.add_argument('--onnx', default='yolo_v3.onnx', help='The onnx file which will be used.')
     parser.add_argument('--image_path', default='images', help='The root directory where data are stored')
-    parser.add_argument('--image_size', default = 416,    help='input image size')
+    parser.add_argument('--image_size', default = 608,    help='input image size')
     parser.add_argument('--confidece', default = 0.3,     help='The confidence threshold of predicted objects')
     parser.add_argument('--nms_thresh', default = 0.5,    help='NMS threshold')
     
-    parser.add_argument('--class_names', default= ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 
-                           'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 
-                           'sofa', 'train', 'tvmonitor'], help= 'The category of predictions that the model can cover')
+    parser.add_argument('--class_names', default= ['garbage', 'garbage_bin', 'overflow']
+                        , help= 'The category of predictions that the model can cover')
     parser.add_argument('--class_colors', default= {
-                                                    'aeroplane': (255, 0, 0),       # 蓝色
-                                                    'bicycle': (0, 255, 0),         # 绿色
-                                                    'bird': (0, 0, 255),            # 红色
-                                                    'boat': (255, 255, 0),          # 青色
-                                                    'bottle': (255, 0, 255),        # 洋红
-                                                    'bus': (0, 255, 255),           # 黄色
-                                                    'car': (128, 0, 128),           # 紫色
-                                                    'cat': (0, 128, 128),           # 深绿色
-                                                    'chair': (128, 128, 0),         # 橄榄绿
-                                                    'cow': (64, 64, 64),            # 灰色
-                                                    'diningtable': (0, 64, 128),    # 深蓝色
-                                                    'dog': (128, 64, 0),            # 棕色
-                                                    'horse': (0, 128, 64),          # 暗绿色
-                                                    'motorbike': (128, 128, 255),   # 浅蓝色
-                                                    'person': (64, 0, 64),          # 紫红色
-                                                    'pottedplant': (128, 0, 0),     # 深红色
-                                                    'sheep': (0, 128, 255),         # 天蓝色
-                                                    'sofa': (128, 255, 128),        # 浅绿色
-                                                    'train': (255, 128, 0),         # 橙色
-                                                    'tvmonitor': (64, 255, 64)      # 浅绿色
+                                                    'garbage': (255, 0, 0),       # 蓝色
+                                                    'garbage_bin': (0, 255, 0),         # 绿色
+                                                    'overflow': (0, 0, 255),            # 红色
                                                 }, help= 'The category of predictions that the model can cover')
     return parser.parse_args()
 
@@ -74,9 +56,7 @@ def nms(bboxes, scores, nms_thresh):
 
     return keep
 
-def preinfer(image_path, image_size):
-    image = cv2.imread(image_path)
-
+def preinfer(image, image_size):
     ratio = [image_size/image.shape[1], image_size/image.shape[0]]
 
     output = cv2.resize(image, (image_size, image_size))
@@ -87,23 +67,15 @@ def preinfer(image_path, image_size):
 
     return  image, output, ratio
 
-def infer(input, onnx, cuda):
+def infer(input, session):   
     start = time.time()
 
-    if cuda:
-        providers = [('CUDAExecutionProvider', {
-            'device_id': 0
-        })]
-    else:
-        providers = [('CPUExecutionProvider', {})]
-    
-    session = onnxruntime.InferenceSession(onnx, providers=providers)
-    
     output = session.run(['output'], {'input': input})
 
-    end = time.time() - start
-    print(end)
-    print("Inference time (Hz):", 1 / end)
+    end = time.time()
+    
+    print(end-start)
+    print("Inference time (Hz):", 1 / (end-start))
 
     return output
 
@@ -146,43 +118,61 @@ def postinfer(input, ratio, image_size, class_names, conf_thresh, nms_thresh):
 if __name__ == "__main__":
     args = parse_args()
 
-    images_list = [os.path.join(os.path.abspath(args.image_path), _) for _ in os.listdir(args.image_path)]
-    for image in images_list:
+    if args.cuda:
+        providers = [('CUDAExecutionProvider', {
+            'device_id': 0
+        })]
+        print('use cuda')
+    else:
+        providers = [('CPUExecutionProvider', {})]
 
-        start_time = time.time()
-        ## TODO ONE
-        image, infer_input, ratio = preinfer(image, args.image_size)
+    cap = cv2.VideoCapture('video.mp4')
+    session = onnxruntime.InferenceSession(args.onnx, providers=providers)
 
-        ## TODO TWO
-        postinfer_input = infer(infer_input, args.onnx, args.cuda) # 400*(4+20)
+    while True:
+        ret, image = cap.read()
+        if ret:
+            start_time = time.time()
+            ## TODO ONE
+            image, infer_input, ratio = preinfer(image, args.image_size)
 
-        ## TODO THREE
-        labels, scores, bboxes = postinfer(postinfer_input, ratio, args.image_size, 
-                                           args.class_names, args.confidece, args.nms_thresh)
+            ## TODO TWO
+            postinfer_input = infer(infer_input, session) # 400*(4+20)
 
-        end_time = time.time()
-        ## TODO FOUR
-        for i, bbox in enumerate(bboxes):
-            score = scores[i]
-            label = labels[i]
-            
-            label_name = args.class_names[label]
-            bbox = [int(point) for point in bbox]
 
-            cv2.rectangle(image, (bbox[0], bbox[1]),  (bbox[2], bbox[3]), args.class_colors[label_name], 1)
-            
-            text = "%s:%s"%(label_name, str(round(float(score), 2)))
-            (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
-            cv2.rectangle(image, (bbox[0], bbox[1]),  (bbox[0] + w, bbox[1] + h), args.class_colors[label_name], -1) 
-            cv2.putText(image, text, (bbox[0], bbox[1]+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
-            
-            text = "fps:%s"%(str(round(1 / (end_time - start_time), 2)))
-            (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
-            cv2.rectangle(image, (0, 0), (w, h), (255, 255, 255), -1) 
-            cv2.putText(image, text, (0, h), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 0), 1)
+            ## TODO THREE
+            labels, scores, bboxes = postinfer(postinfer_input, ratio, args.image_size, 
+                                            args.class_names, args.confidece, args.nms_thresh)
 
-        cv2.imshow('image', image)
+            end_time = time.time()
+            ## TODO FOUR
+            for i, bbox in enumerate(bboxes):
+                score = scores[i]
+                label = labels[i]
+                
+                label_name = args.class_names[label]
+                bbox = [int(point) for point in bbox]
 
-        # 退出循环的按键（通常是'q'键）  
-        if cv2.waitKey(0) == ord('q'):  
+                cv2.rectangle(image, (bbox[0], bbox[1]),  (bbox[2], bbox[3]), args.class_colors[label_name], 1)
+                
+                text = "%s:%s"%(label_name, str(round(float(score), 2)))
+                (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
+                cv2.rectangle(image, (bbox[0], bbox[1]),  (bbox[0] + w, bbox[1] + h), args.class_colors[label_name], -1) 
+                cv2.putText(image, text, (bbox[0], bbox[1]+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+                
+                text = "fps:%s"%(str(round(1 / (end_time - start_time), 2)))
+                (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
+                cv2.rectangle(image, (0, 0), (w, h), (255, 255, 255), -1) 
+                cv2.putText(image, text, (0, h), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 0), 1)
+
+            cv2.imshow('image', image)
+
+            # 退出循环的按键（通常是'q'键）  
+            if cv2.waitKey(0) == ord('q'):  
+                break
+        
+        else:
             break
+
+    cap.release()
+    cv2.destroyAllWindows()
