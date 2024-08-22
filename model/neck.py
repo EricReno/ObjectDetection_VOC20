@@ -47,3 +47,9 @@ class FPN(nn.Module):
         f1 = self.conv1(torch.cat([f2_up, x1], dim=1))
 
         return [f1, f2, f3]
+
+def build_neck(feat_dims):
+    neck = FPN(feat_dims)
+    dims = [dim//2 for dim in feat_dims]
+
+    return neck, dims

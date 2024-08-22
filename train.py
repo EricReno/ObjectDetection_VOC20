@@ -2,9 +2,9 @@ import os
 import time
 import torch
 import numpy
+from eval import Evaluator
+from model.yolo import YOLO
 from config import parse_args
-from eval import VOCEvaluator
-from model.yolov3 import YOLOv3
 from metric.criterion import Loss
 from dataset.voc import VOCDataset
 from dataset.utils import CollateFunc
@@ -12,12 +12,12 @@ from dataset.augment import Augmentation
 from torch.utils.tensorboard import SummaryWriter
 
 def train():
-    args = parse_args()
+    parser, args = parse_args()
     writer = SummaryWriter('log')
     print("Setting Arguments.. : ")
-    for k, v in sorted(vars(args).items()):
-        print(k, '=', v)
-    print("--------------------------------------------------------")
+    for action in parser._actions:
+        if action.dest != 'help':
+            print(f"{action.dest} = {getattr(args, action.dest)}")
 
     if args.cuda and torch.cuda.is_available():
         device = torch.device('cuda')
@@ -25,78 +25,79 @@ def train():
         device = torch.device('cpu')
 
     # ---------------------------- Build Datasets ----------------------------
-    val_trans = Augmentation(args.image_size, args.data_augment, is_train=False)
-    val_dataset = VOCDataset(data_dir     = args.data_root,
-                             image_sets   = args.datasets_val,
-                             transform    = val_trans,
-                             is_train     = False)
+    val_transformer = Augmentation(is_train=False, image_size=args.image_size, transforms=args.data_augment)
+    val_dataset = VOCDataset(is_train = False,
+                             data_dir = args.data_root,
+                             transform = val_transformer,
+                             image_set = args.val_dataset,
+                             voc_classes = args.class_names,
+                             )
     val_sampler = torch.utils.data.RandomSampler(val_dataset)
     val_b_sampler = torch.utils.data.BatchSampler(val_sampler, args.batch_size, drop_last=True)
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_sampler=val_b_sampler, collate_fn=CollateFunc(), num_workers=args.worker_number, pin_memory=True)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_sampler=val_b_sampler, collate_fn=CollateFunc(), num_workers=args.num_workers, pin_memory=True)
     
-    train_trans = Augmentation(args.image_size, args.data_augment, is_train=True)
-    train_dataset = VOCDataset(img_size   = args.image_size,
-                               data_dir   = args.data_root,
-                               image_sets = args.datasets_train,
-                               transform  = train_trans,
-                               is_train   = True)
+    train_transformer = Augmentation(is_train=True, image_size=args.image_size, transforms=args.data_augment)
+    train_dataset = VOCDataset(is_train = False,
+                               data_dir = args.data_root,
+                               transform = train_transformer,
+                               image_set = args.train_dataset,
+                               voc_classes = args.class_names,
+                               )
+    
     train_sampler = torch.utils.data.RandomSampler(train_dataset)
     train_b_sampler = torch.utils.data.BatchSampler(train_sampler, args.batch_size, drop_last=True)
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_b_sampler, collate_fn=CollateFunc(), num_workers=args.worker_number, pin_memory=True)
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_b_sampler, collate_fn=CollateFunc(), num_workers=args.num_workers, pin_memory=True)
 
     # ----------------------- Build Model ----------------------------------------
-    model = YOLOv3(device = device,
-                   backbone = args.backbone,
-                   image_size=args.image_size,
-                   nms_thresh=args.threshold_nms,
-                   anchor_size = args.anchor_size,
-                   num_classes=args.classes_number,
-                   conf_thresh = args.threshold_conf,
-                   boxes_per_cell=args.boxes_per_cell
-                   ).to(device)
+    model = YOLO(device = device,
+                 trainable = True,
+                 backbone = args.backbone,
+                 anchor_size = args.anchor_size,
+                 num_classes = args.num_classes,
+                 nms_threshold = args.nms_threshold,
+                 boxes_per_cell = args.boxes_per_cell,
+                 confidence_threshold = args.confidence_threshold
+                 ).to(device)
           
     criterion =  Loss(device = device,
                          anchor_size = args.anchor_size,
-                         num_classes = args.classes_number,
+                         num_classes = args.num_classes,
                          boxes_per_cell = args.boxes_per_cell,
-                         loss_box_weight = args.loss_box_weight,
-                         loss_obj_weight = args.loss_obj_weight,
-                         loss_cls_weight = args.loss_cls_weight,
-                         )
+                         bbox_loss_weight = args.bbox_loss_weight,
+                         objectness_loss_weight = args.objectness_loss_weight,
+                         class_loss_weight = args.class_loss_weight)
     
-    evaluator = VOCEvaluator(
+    evaluator = Evaluator(
         device   =device,
-        data_dir = args.data_root,
         dataset  = val_dataset,
-        image_sets = args.datasets_val,
-        ovthresh    = args.threshold_nms,                        
+        ovthresh = args.nms_threshold,                        
         class_names = args.class_names,
-        recall_thre = args.threshold_recall,
-        )
+        recall_thre = args.recall_threshold,
+        visualization = args.eval_visualization)
     
     grad_accumulate = max(1, round(64 / args.batch_size))
-    learning_rate = (grad_accumulate*args.batch_size/64)*args.lr
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=args.lr_momentum, weight_decay=args.lr_weight_decay)
+    learning_rate = (grad_accumulate*args.batch_size/64)*args.learning_rate
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
     
     max_mAP = 0
     start_epoch = 0
     # ----------------------- Build Train ----------------------------------------
     start = time.time()
-    for epoch in range(start_epoch, args.epoch_max):
+    for epoch in range(start_epoch, args.epochs_total):
         model.train()
         train_loss = 0.0
         model.trainable = True
         for iteration, (images, targets) in enumerate(train_dataloader):
             ## learning rate
             ni = iteration + epoch * args.batch_size
-            if epoch < args.epoch_warmup:
+            if epoch < args.warmup_epochs:
                 optimizer.param_groups[0]['lr'] = numpy.interp(epoch*len(train_dataloader)+iteration,
-                                                               [0, args.epoch_warmup*len(train_dataloader)],
-                                                               [args.lr_warmup, learning_rate])
-            elif epoch >= args.epoch_second:
-                optimizer.param_groups[0]['lr'] = args.lr_second
-            elif epoch >= args.epoch_thirdly:
-                optimizer.param_groups[0]['lr'] = args.lr_thirdly
+                                                               [0, args.warmup_epochs*len(train_dataloader)],
+                                                               [args.warmup_learning_rate, learning_rate])
+            elif epoch >= args.second_stage_epochs:
+                optimizer.param_groups[0]['lr'] = args.second_stage_lr
+            elif epoch >= args.third_stage_epochs:
+                optimizer.param_groups[0]['lr'] = args.third_stage_lr
 
             ## forward
             images = images.to(device)
@@ -119,7 +120,7 @@ def train():
 
             ## log
             print("Time [{}], Epoch [{}:{}/{}:{}], lr: {:.5f}, Loss: {:8.4f}, Loss_obj: {:8.4f}, Loss_cls: {:6.3f}, Loss_box: {:6.3f}".format(time.strftime('%H:%M:%S', time.gmtime(time.time()- start)), 
-                  epoch, args.epoch_max, iteration+1, len(train_dataloader), optimizer.param_groups[0]['lr'], losses, loss_obj, loss_cls, loss_box))
+                  epoch, args.epochs_total, iteration+1, len(train_dataloader), optimizer.param_groups[0]['lr'], losses, loss_obj, loss_cls, loss_box))
             train_loss += losses.item() * images.size(0)
         
         train_loss /= len(train_dataloader.dataset)
@@ -134,16 +135,16 @@ def train():
                 loss_dict = criterion(outputs=outputs, targets=targets)
                 losses = loss_dict['losses'] #[loss_obj, loss_cls, loss_box, losses]
                 print("Time [{}], Epoch [{}:{}/{}:{}], lr: {:.5f}, Loss: {:8.4f} ".format(time.strftime('%H:%M:%S', time.gmtime(time.time()- start)), 
-                  epoch, args.epoch_max, iteration+1, len(val_dataloader), optimizer.param_groups[0]['lr'], losses))
+                  epoch, args.epochs_total, iteration+1, len(val_dataloader), optimizer.param_groups[0]['lr'], losses))
                 val_loss += losses.item() * images.size(0) 
             val_loss /= len(val_dataloader.dataset) 
             writer.add_scalar('Loss/val', val_loss, epoch)
         
         # save_model
-        if epoch >= args.epoch_save:
+        if epoch >= args.save_checkpoint_epoch:
             model.trainable = False
-            model.nms_thresh = args.threshold_nms
-            model.conf_thresh = args.threshold_conf
+            model.nms_thresh = args.nms_threshold
+            model.conf_thresh = args.confidence_threshold
 
             weight = '{}.pth'.format(epoch)
             ckpt_path = os.path.join(os.getcwd(), 'log', weight)
@@ -154,7 +155,7 @@ def train():
                 mAP = evaluator.eval(model)
             writer.add_scalar('mAP', mAP, epoch)
             print("Epoch [{}]".format('-'*100))
-            print("Epoch [{}:{}], mAP [{:.4f}]".format(epoch, args.epoch_max, mAP))
+            print("Epoch [{}:{}], mAP [{:.4f}]".format(epoch, args.epochs_total, mAP))
             print("Epoch [{}]".format('-'*100))
             if mAP > max_mAP:
                 torch.save({'model': model.state_dict(),

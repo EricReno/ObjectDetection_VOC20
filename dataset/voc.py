@@ -4,48 +4,44 @@ import numpy as np
 import torch.utils.data as data
 import xml.etree.ElementTree as ET
 
-# VOC class names
-VOC_CLASSES = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 
-               'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 
-               'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
+# VOC_CLASSES = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 
+#                'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 
+#                'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
 
 class VOCDataset(data.Dataset):
     def __init__(self,
-                 img_size :int = 640,
+                 is_train :bool = False,
                  data_dir :str = None, 
-                 image_sets = [('2007', 'trainval'), ('2012', 'trainval')],
                  transform = None,
-                 is_train :bool = False) -> None:
+                 image_set :list = [],
+                 voc_classes :list = []) -> None:
         super().__init__()
 
-        self.img_size = img_size
-        self.image_set = image_sets
         self.is_train = is_train
+        self.data_dir = data_dir
+        self.transform = transform
+        self.image_set = image_set
         
-        self.root = data_dir
         self._imgpath = os.path.join('%s', 'JPEGImages', '%s.jpg')
         self._annopath = os.path.join('%s', 'Annotations', '%s.xml')
 
+        self.class_to_ind = dict(zip(voc_classes, range(len(voc_classes))))
+
         self.ids = list()
         for (year, name) in self.image_set:
-            rootpath = os.path.join(self.root, 'VOC' + year)
+            rootpath = os.path.join(self.data_dir, 'VOC' + year)
             for line in open(os.path.join(rootpath, 'ImageSets', 'Main', name+'.txt')):
                 self.ids.append((rootpath, line.strip()))
-        self.dataset_size = len(self.ids)
-
-        self.class_to_ind = dict(zip(VOC_CLASSES, range(len(VOC_CLASSES))))
-
-        self.transform = transform
 
     def __getitem__(self, index):
         image, target = self.load_image_target(index)
 
-        image, target, deltas = self.transform(image, target, False)
+        image, target, deltas = self.transform(image, target)
         
         return image, target, deltas
     
     def __len__(self):
-        return self.dataset_size
+        return len(self.ids)
     
     def __add__(self, other: data.Dataset) -> data.ConcatDataset:
         return super().__add__(other)
@@ -56,42 +52,42 @@ class VOCDataset(data.Dataset):
         
         anno, _ = self.pull_anno(index)
 
-        # guard against no boxes via resizing
-        anno = np.array(anno).reshape(-1, 5)
+        h, w = image.shape[:2]
         target = {
             "boxes": anno[:, :4],
             "labels": anno[:, 4],
-            "orig_size": [image.shape[0], image.shape[1]]
+            "orig_size": [h, w]
         }
 
         return image, target
 
     def pull_image(self, index):
-        img_id = self.ids[index]
-        image = cv2.imread(self._imgpath % img_id, cv2.IMREAD_COLOR)
+        id = self.ids[index]
+        image = cv2.imread(self._imgpath % id, cv2.IMREAD_COLOR)
 
-        return image, img_id
+        return image, id
     
     def pull_anno(self, index):
-        img_id = self.ids[index]
+        id = self.ids[index]
 
         anno = []
-        xml = ET.parse(self._annopath %img_id).getroot()
+        xml = ET.parse(self._annopath %id).getroot()
         for obj in xml.iter('object'):
             difficult = int(obj.find('difficult').text) == 1
-            if difficult:
+            if self.is_train and difficult:
                 continue
 
-            name = obj.find('name').text.lower().strip()
+            bndbox = []
             bbox = obj.find('bndbox')
+            name = obj.find('name').text.lower().strip()
 
             pts = ['xmin', 'ymin', 'xmax', 'ymax']
-            bndbox = []
             for i, pt in enumerate(pts):
-                cur_pt = int(bbox.find(pt).text) - 1
+                cur_pt = float(bbox.find(pt).text)
                 bndbox.append(cur_pt)
-            label_idx = self.class_to_ind[name]
+
+            label_idx = self.class_to_ind[name]*(-1 if difficult else 1)
             bndbox.append(label_idx)
             anno += bndbox
 
-        return anno, img_id
+        return np.array(anno).reshape(-1, 5), id

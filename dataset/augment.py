@@ -121,6 +121,7 @@ class RandomSampleCrop(object):
         area_b = (box_b[2]-box_b[0]) * (box_b[3]-box_b[1])
 
         union = area_a + area_b - area_inter
+        union = np.maximum(union, np.finfo(float).eps)
         
         return area_inter / union
     
@@ -134,10 +135,8 @@ class RandomSampleCrop(object):
                 return image, boxes, labels
             
             min_iou, max_iou = mode
-            if min_iou is None:
-                min_iou = float('-inf')
-            if max_iou is None:
-                max_iou = float('inf')
+            min_iou = min_iou if min_iou is not None else float('-inf')
+            max_iou = max_iou if max_iou is not None else float('inf')
 
             for _ in range(50):
                 current_image = image
@@ -148,8 +147,8 @@ class RandomSampleCrop(object):
                 if h / w  < 0.5 or h / w > 2:
                     continue
 
-                left = np.random.uniform(width - w)
-                top = np.random.uniform(height - h)
+                left = np.random.uniform(0, width - w)
+                top = np.random.uniform(0, height - h)
 
                 rect = np.array([int(left), int(top), int(left+w), int(top+h)])
 
@@ -162,11 +161,9 @@ class RandomSampleCrop(object):
 
                 centers = (boxes[:, :2] + boxes[:, 2:]) / 2.0
 
-                m1 = (rect[0] < centers[:, 0]) * (rect[1] < centers[:, 1])
-
-                m2 = (rect[2] > centers[:, 0]) * (rect[3] > centers[:, 1])
-
-                mask = m1 * m2
+                # 判断中心点是否在裁剪框内
+                mask = (rect[0] < centers[:, 0]) * (rect[1] < centers[:, 1]) * \
+                    (rect[2] > centers[:, 0]) * (rect[3] > centers[:, 1])
 
                 if not mask.any():
                     continue
@@ -261,28 +258,31 @@ class RandomSaturationHue(object):
 
         return image, boxes, labels
 
-augment_dict = {
-    'RandomHorizontalFlip': RandomHorizontalFlip(),
-    'RandomSampleCrop'    : RandomSampleCrop(),
-    'RandomExpand'        : RandomExpand(),
-    'RandomBrightness'    : RandomBrightness(),
-    'RandomContrast'      : RandomContrast(),
-    'RandomSaturationHue' : RandomSaturationHue(),
-}
-
 class Augmentation():
-    def __init__(self, img_size = 640, transforms = None, is_train = True) -> None:
-        self.img_size = img_size
-        self.pixel_mean = [0, 0, 0]
-        self.pixel_std = [255, 255, 255]
-        self.color_format = 'bgr'
-        self.transforms = []
-        for t in transforms:
-            self.transforms.append(augment_dict[t])
+    def __init__(self, 
+                 is_train = True,
+                 image_size = 608, 
+                 transforms = None, 
+                 ) -> None:
+
         self.is_train = is_train
+        self.image_size = image_size
+
+        self.transforms = []
+        augments = {
+            'RandomContrast'      : RandomContrast(),
+            'RandomBrightness'    : RandomBrightness(),
+            'RandomSaturationHue' : RandomSaturationHue(),
+
+            'RandomExpand'        : RandomExpand(),
+            'RandomSampleCrop'    : RandomSampleCrop(),
+            'RandomHorizontalFlip': RandomHorizontalFlip(),
+        }
+        for t in transforms:
+            self.transforms.append(augments[t])
     
-    def __call__(self, image, target = None, mosaic = False):   
-        image = image.astype(np.float32)
+    def __call__(self, image, target = None):   
+        image = image.astype(np.float32).copy()
         boxes = target['boxes'].copy()
         labels = target['labels'].copy()
 
@@ -292,15 +292,15 @@ class Augmentation():
 
         # resize
         t_h, t_w = image.shape[:2]
-        ratio = [self.img_size / t_w , self.img_size / t_h]
+        ratio = [self.image_size / t_w , self.image_size / t_h]
 
-        image = cv2.resize(image, (self.img_size, self.img_size))
+        image = cv2.resize(image, (self.image_size, self.image_size))
         if boxes is not None:
             boxes[..., [0, 2]] = boxes[..., [0, 2]] * ratio[0]
             boxes[..., [1, 3]] = boxes[..., [1, 3]] * ratio[1]
 
         ## to tensor
-        img_tensor = torch.from_numpy(image.copy()).permute(2, 0, 1).contiguous().float()
+        img_tensor = torch.from_numpy(image).permute(2, 0, 1).contiguous().float()
         target['boxes'] = torch.from_numpy(boxes).float()
         target['labels'] = torch.from_numpy(labels).float()
 

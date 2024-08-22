@@ -1,16 +1,19 @@
-# Hello, YoloV1--VOC20
-- YOLO v1 论文传送门：https://arxiv.org/abs/1506.02640
+# Hello, You Only Look Once -- VOC20
+(You only live once)
+
+- 传送门：https://arxiv.org/abs/1506.02640 (Yolo v1)
 
 ## 数据集: VOC 
 - **test**: (VOC2007, test) : 4952
 - **train**: (VOC2007, trainval), (VOC2012, trainval) : 16553
 - **CLASSES_NAMES**: 
-|           |         |        |         |          | 
-|   :---:   |  :---:  | :---:  |  :---:  | :---:    | 
-| aeroplane | bicycle |  bird  |  boat   | bottle   | 
-|    bus    |   car   |  cat   |  chair  | cow      | 
-|diningtable|   dog   | horse  |motorbike| person   | 
-|pottedplant|  sheep  |  sofa  | train   | tvmonitor| 
+
+|             |          |         |           |           |
+| :---------: | :------: | :-----: | :-------: | :-------: |
+|  aeroplane  | bicycle  |  bird   |   boat    | bottle    |
+|     bus     |   car    |  cat    |  chair    | cow       |
+| diningtable |   dog    | horse   | motorbike | person    |
+| pottedplant |  sheep   |  sofa   |  train    | tvmonitor |
 
 - **官方网址** 
     http://host.robots.ox.ac.uk/pascal/VOC/voc2007/index.html
@@ -18,23 +21,25 @@
 
 
 ## 通用设置
-| Backbone | Size  |  BS | Pretrain|Augment| Epoch| Obj_Weight | Cls_Weight | Box_Weight | NMS_Thre | Conf_Thre|
-|  :---:   | :---: |:---:|  :---:  | :---: |:---: |   :---:    |:---:       | :---:      | :---:    | :---:    |
-| Resnet18 |640x640|  32 |   CoCo  | None  | 150  |   1.0      | 1.0        | 5.0        | 0.5      |  0.3     |
+| Size  |  BS | Pretrain| Epoch| Obj | Cls | Box | NMS_Thre | Conf_Thre| APT
+| :---: |:---:|  :---:  | :---:|   :---: |:---:  | :---:      | :---:    | :---:    | :---:    |
+|608x608|  24 |   CoCo  |  160 |   1.0 | 1.0  | 5.0        | 0.5      |  0.3     | SGD|
 
+| Augmentation|
+|   :---:     |
+|RandomSaturationHue|
+|RandomContrast|
+|RandomBrightness|
+|RandomSampleCrop|
+|RandomExpand|
+|RandomHorizontalFlip|
 
-## LearningRate: lr = (bs/64) * args.lr
-| Name  | args.LR|  WarmUp |  OPT   |Momentum_Decay|             |   mAP    |       |
-| :---: | :---:  |  :---:  | :---:  | :---:        |    :---:    |  :---:   | :---: |
-|event_0| 0.0001 |  False  |  SGD   |   --         | Underfitting|17.04%(47)|       |
-|event_1| 0.001  |  False  |  SGD   |   --         | Overfitting |28.80%(21)|       |
-|event_2| 0.01   |  [0-1]  |  SGD   |   --         |      --     |00.00%(05)|       |
-|event_3| 0.01   |  [0-3]  |  SGD   | 0.937_0.0005 | Overfitting |46.21%(04)| √     |
 
 ## DataAugment:
-| Name  |    Augmentation   |   mAP    |         |
-| :---: |        :---:      |  :---:   |  :---:  |
-|event_4|+R_Bri_Sat_Hue_Filp|  52.40%  |         |
-|event_5|  +R_Crop_Padding  |  67.47%  |         |
+| TAG  |  Size|    mAP    |    GFLOPs     |Params |Pt_Size| FPS |
+| :---: |   :---:   | :---:   |  :---:  |:---:  |:---:  |:---:  |
+|yolo v1|   608   |67.47%  |         | |||
+|yolo_v3_tiny|   608   |56.17%  |   5.18      | 2.43| 19M|75.44(1050Ti)|
+|yolo_v3_Darknet53|   608   |....%  |  133.40      | 57.43| 442M|10.26(1050Ti)|
 
 <img src="1.jpg">
