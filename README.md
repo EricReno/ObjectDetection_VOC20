@@ -44,5 +44,11 @@
 |yolo_v3_Darknet53|   608   |75.71%  |  133.40      | 57.43| 442M|10.32(1050Ti)|
 
 ## Demo
-https://github.com/user-attachments/assets/4996663b-9bbd-4c83-a535-812f4e401b5d
+
+<video src="[https://github.com/CVHub520/Resources/assets/72010077/a1fb281a-856c-493e-8989-84f4f783576b](https://github.com/user-attachments/assets/4996663b-9bbd-4c83-a535-812f4e401b5d)" 
+       controls 
+       width="100%" 
+       height="auto" 
+       style="max-width: 720px; height: auto; display: block; object-fit: contain;">
+</video>
 
