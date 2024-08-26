@@ -86,7 +86,7 @@ class VOCDataset(data.Dataset):
                 cur_pt = float(bbox.find(pt).text)
                 bndbox.append(cur_pt)
 
-            label_idx = self.class_to_ind[name]*(-1 if difficult else 1)
+            label_idx = self.class_to_ind[name]+(0.1 if difficult else 0)
             bndbox.append(label_idx)
             anno += bndbox
 

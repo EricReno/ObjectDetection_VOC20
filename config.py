@@ -36,7 +36,7 @@ def parse_args():
 
     # Model settings
     parser.add_argument('--backbone', 
-                        default='darknet_tiny',
+                        default='darknet53',
                         type=str,
                         choices=['darknet53', 'darknet_tiny'],
                         help='Backbone network architecture.')
@@ -69,7 +69,7 @@ def parse_args():
 
     # Training settings
     parser.add_argument('--batch_size',
-                        default=1,
+                        default=4,
                         type=int,
                         help='Batch size used during training (per GPU).')
     
@@ -100,7 +100,7 @@ def parse_args():
     
     # Learning rate settings
     parser.add_argument('--learning_rate',             
-                        default=0.005,
+                        default=0.01,
                         type=float,
                         help='Base learning rate.')
     
@@ -110,12 +110,12 @@ def parse_args():
                         help='Learning rate during warm-up phase.')
     
     parser.add_argument('--second_stage_lr',
-                        default=0.0005,
+                        default=0.001,
                         type=float,
                         help='Learning rate during the second stage of training.')
     
     parser.add_argument('--third_stage_lr',
-                        default=0.00005,
+                        default=0.0001,
                         type=float,
                         help='Learning rate during the third stage of training.')
     
@@ -163,7 +163,7 @@ def parse_args():
     
     # Model checkpoint
     parser.add_argument('--model_weight_path',         
-                        default='yolo_tiny.pth',                
+                        default='yolo_darknet53.pth',                
                         type=str,
                         help='Path to the initial model weights.')
 
@@ -173,7 +173,7 @@ def parse_args():
                         help='Path to the checkpoint from which to resume training.')
     
     parser.add_argument('--eval_visualization',         
-                        default=False,                
+                        default=True,                
                         type=bool,
                         help='')
 

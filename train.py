@@ -81,6 +81,14 @@ def train():
     
     max_mAP = 0
     start_epoch = 0
+    if args.resume_weight_path != "None":
+        ckt_pth = os.path.join('log', args.resume_weight_path)
+        checkpoint = torch.load(ckt_pth, map_location='cpu', weights_only=False)
+        max_mAP = checkpoint['mAP']
+        start_epoch = checkpoint['epoch'] + 1         
+        model.load_state_dict(checkpoint["model"])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+
     # ----------------------- Build Train ----------------------------------------
     start = time.time()
     for epoch in range(start_epoch, args.epochs_total):
@@ -160,6 +168,7 @@ def train():
             if mAP > max_mAP:
                 torch.save({'model': model.state_dict(),
                         'optimizer': optimizer.state_dict(),
+                        'mAP':mAP,
                         'epoch': epoch,
                         'args': args},
                         ckpt_path)

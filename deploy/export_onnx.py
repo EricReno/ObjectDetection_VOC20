@@ -9,12 +9,13 @@ import torch
 from model.yolo import YOLO
 from config import parse_args
 
-def export(input, model, weight):
+def export(input, model, weight_name):
+    weight_path = os.path.join('log', weight_name)
     model.deploy = True
     model.trainable = False
-    pt_onnx = weight.replace('.pth', '.onnx')
+    pt_onnx = weight_path.replace('.pth', '.onnx')
 
-    state_dict = torch.load(os.path.join('log', weight), 
+    state_dict = torch.load(weight_path, 
                             map_location = 'cpu', 
                             weights_only = False)
     model.load_state_dict(state_dict.get("model", state_dict))

@@ -91,13 +91,16 @@ class Evaluator():
             # rescale grountruth targets
             target['boxes'] = rescale_bboxes(target['boxes'], list(image.shape[-2:]), deltas)
             for j in range(self.num_classes):
-                inds = np.where(np.abs(target['labels']) == j)[0]
+                inds = np.where((target['labels'] == j) | (target['labels'] == j+0.1))[0]
 
                 if len(inds) == 0:
                     self.all_gt_boxes[j][self.dataset.ids[i][1]] = np.array([], dtype=np.float32)
                     continue
                 c_gt_bboxes = target['boxes'][inds]
-                c_gt_diffcult = np.sign(target['labels'][inds])
+
+                frac, _ = np.modf(target['labels'][inds])
+                c_gt_diffcult = np.where(np.round(frac * 10) == 1, 1, 0)
+
                 c_gts = np.hstack((c_gt_bboxes, c_gt_diffcult[:, np.newaxis])).astype(np.float32, copy=False)
                 self.all_gt_boxes[j][self.dataset.ids[i][1]] = c_gts
             
@@ -123,7 +126,8 @@ class Evaluator():
                         cv2.rectangle(prediction_image, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), class_colors[labels[index]])
                         cv2.rectangle(prediction_image, (int(box[0]), int(box[1])),  (int(box[0]) + w, int(box[1]) + h), class_colors[labels[index]], -1) 
                         cv2.putText(prediction_image, text, (int(box[0]), int(box[1])+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
-                        cv2.putText(prediction_image, 'prediction', (5, 15), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+                    cv2.rectangle(prediction_image, (0, 0),  (50, 20), (0,0,0), -1) 
+                    cv2.putText(prediction_image, 'DT', (5, 20), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
 
                     # groundtruth
                     for index, box in enumerate(target['boxes']):
@@ -132,7 +136,8 @@ class Evaluator():
                         cv2.rectangle(groundtruth_image, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), class_colors[int(target['labels'][index])])
                         cv2.rectangle(groundtruth_image, (int(box[0]), int(box[1])),  (int(box[0]) + w, int(box[1]) + h), class_colors[int(target['labels'][index])], -1) 
                         cv2.putText(groundtruth_image, text, (int(box[0]), int(box[1])+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
-                        cv2.putText(groundtruth_image, 'groundtruth', (5, 15), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+                    cv2.rectangle(groundtruth_image, (0, 0),  (50, 20), (0,0,0), -1) 
+                    cv2.putText(groundtruth_image, 'GT', (5, 20), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
 
                     show_image = np.concatenate((groundtruth_image, prediction_image), axis=1)
                     cv2.imshow('1', show_image)
@@ -151,7 +156,7 @@ class Evaluator():
                 gts[image_id] = {}
                 continue
 
-            difficult = np.array([x[-1]-1 for x in self.all_gt_boxes[class_index][image_id]]).astype(bool)
+            difficult = np.array([box[-1] for box in self.all_gt_boxes[class_index][image_id]]).astype(bool)
             gts[image_id] = {'bbox': np.array(self.all_gt_boxes[class_index][image_id][:, :4]),
                              'difficult': difficult,
                              'det': [False] * len(self.all_gt_boxes[class_index][image_id])}
@@ -289,12 +294,15 @@ if __name__ == "__main__":
                  boxes_per_cell = args.boxes_per_cell,
                  confidence_threshold = args.confidence_threshold
                  ).eval().to(device)
-    
+
     state_dict = torch.load(
-                            f = os.path.join(os.getcwd(), 'log', args.model_weight_path), 
+                            f = os.path.join('log', args.model_weight_path), 
                             map_location = 'cpu', 
                             weights_only = False)
+    print('mAP:', state_dict['mAP'])
+    
     model.load_state_dict(state_dict["model"])
+
     
     evaluator = Evaluator(
         device   = device,
