@@ -1,40 +1,44 @@
 import torch
-import argparse
 import numpy as np
 import torch.nn as nn
 
-from model.neck import FPN
+import os
+import sys
+cur = os.path.dirname(os.path.abspath(__file__))
+pro_path = os.path.abspath(os.path.join(cur, '..'))
+sys.path.append(pro_path)
+
+from config import parse_args
 from model.head import Decouple
+from model.neck import build_neck
 from model.backbone.darknet import build_backbone
 
-class YOLOv3(nn.Module):
+class YOLO(nn.Module):
     def __init__(self, 
                  device,
+                 trainable,
                  backbone,
-                 image_size,
-                 nms_thresh,
                  anchor_size,
                  num_classes,
-                 conf_thresh,
-                 boxes_per_cell
+                 nms_threshold,
+                 boxes_per_cell,
+                 confidence_threshold
                  ):
-        super(YOLOv3, self).__init__()
+        super(YOLO, self).__init__()
 
-        self.stride = [8, 16, 32]                            
         self.deploy = False
         self.device = device
-        self.trainable = False
-        self.image_size = image_size
-        self.nms_thresh = nms_thresh
+        self.stride = [8, 16, 32]                            
+        self.trainable = trainable
         self.num_classes = num_classes
-        self.conf_thresh = conf_thresh
+        self.nms_threshold = nms_threshold
         self.boxes_per_cell = boxes_per_cell
+        self.confidence_threshold = confidence_threshold
         self.anchor_size = torch.as_tensor(anchor_size).float().view(3, -1, 2) # [A, 2]   # 416 scale
 
-        self.backbone, feat_dims = build_backbone(backbone, pretrained=True)
+        self.backbone, feat_dims = build_backbone(backbone, pretrained=trainable)
         
-        self.neck = FPN(feat_dims)
-        feat_dims = [dim//2 for dim in feat_dims]
+        self.neck, feat_dims = build_neck(feat_dims)
 
         self.heads = nn.ModuleList(
             [Decouple(dim) for dim in feat_dims]
@@ -168,10 +172,9 @@ class YOLOv3(nn.Module):
 
             topk_scores, topk_idxs = scores_i.sort(descending=True)
 
-            keep_idxs = topk_scores > self.conf_thresh
+            keep_idxs = topk_scores > self.confidence_threshold
             scores = topk_scores[keep_idxs]
             topk_idxs = topk_idxs[keep_idxs]
-
 
             anchor_idxs = torch.div(topk_idxs, self.num_classes, rounding_mode='floor')
             labels = topk_idxs % self.num_classes
@@ -191,17 +194,6 @@ class YOLOv3(nn.Module):
         labels = labels.cpu().numpy()
         bboxes = bboxes.cpu().numpy()
 
-
-
-        # labels = np.argmax(scores, axis=1)
-        # scores = scores[(np.arange(scores.shape[0]), labels)]
-        
-        # # threshold
-        # keep = np.where(scores >= self.conf_thresh)
-        # bboxes = bboxes[keep]
-        # scores = scores[keep]
-        # labels = labels[keep]
-
         # nms
         keep = np.zeros(len(bboxes), dtype=np.int32)
         for i in range(self.num_classes):
@@ -210,7 +202,7 @@ class YOLOv3(nn.Module):
                 continue
             c_bboxes = bboxes[inds]
             c_scores = scores[inds]
-            c_keep = self.nms(c_bboxes, c_scores, self.nms_thresh)
+            c_keep = self.nms(c_bboxes, c_scores, self.nms_threshold)
             keep[inds[c_keep]] = 1
         keep = np.where(keep > 0)
         scores = scores[keep]
@@ -221,8 +213,6 @@ class YOLOv3(nn.Module):
 
     @torch.no_grad()
     def inference(self, x):
-        batch_size = x.shape[0]
-
         backbone_feats = self.backbone(x) # [1, 3, 416, 416] --> [1, 256, 52, 52], [1, 512, 26, 26], [1, 1024, 13, 13]
 
         pyramid_feats = self.neck(backbone_feats) # --> [torch.Size([1, 128, 52, 52]), torch.Size([1, 256, 26, 26]), torch.Size([1, 512, 13, 13])]
@@ -258,9 +248,13 @@ class YOLOv3(nn.Module):
             all_anchors.append(anchors)
 
         if self.deploy:
+            obj_preds = torch.cat(all_obj_preds, dim=0)
+            cls_preds = torch.cat(all_cls_preds, dim=0)
+            box_preds = torch.cat(all_box_preds, dim=0)
+            scores = torch.sqrt(obj_preds.sigmoid() * cls_preds.sigmoid())
+            bboxes = box_preds
             # [n_anchors_all, 4 + C]
             outputs = torch.cat([bboxes, scores], dim=-1)
-            return outputs
         else:
             bboxes, scores, labels = self.postprocess(
                 all_obj_preds, all_cls_preds, all_box_preds)
@@ -279,9 +273,11 @@ class YOLOv3(nn.Module):
         else:
             batch_size = x.shape[0]
 
-            backbone_feats = self.backbone(x) # [1, 3, 416, 416] --> [1, 256, 52, 52], [1, 512, 26, 26], [1, 1024, 13, 13]
-
-            pyramid_feats = self.neck(backbone_feats) # --> [torch.Size([1, 128, 52, 52]), torch.Size([1, 256, 26, 26]), torch.Size([1, 512, 13, 13])]
+            # [1, 3, 416, 416] --> [[1, 256, 52, 52], [1, 512, 26, 26], [1, 1024, 13, 13]]
+            backbone_feats = self.backbone(x) 
+            
+            # --> [torch.Size([1, 128, 52, 52]), torch.Size([1, 256, 26, 26]), torch.Size([1, 512, 13, 13])]
+            pyramid_feats = self.neck(backbone_feats) 
 
             all_fmp_sizes = []
             all_obj_preds = []
@@ -312,7 +308,6 @@ class YOLOv3(nn.Module):
                 all_box_preds.append(box_pred)
                 all_fmp_sizes.append(fmp_size)
 
-        # 网络输出
         outputs = {"pred_obj": all_obj_preds,                 # (List) [B, M, 1]
                    "pred_cls": all_cls_preds,                 # (List) [B, M, C]
                    "pred_box": all_box_preds,                 # (List) [B, M, 4]
@@ -323,40 +318,31 @@ class YOLOv3(nn.Module):
         return outputs
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Yolo v3')
-    parser.add_argument('--cuda',           default=False,  help='Weather use cuda.')
-    parser.add_argument('--batch_size',     default=1,      help='The batch size used by a single GPU during training')
-    parser.add_argument('--image_size',     default=416,    help='input image size')
-    parser.add_argument('--num_classes',    default=20,     help='The number of the classes')
-    parser.add_argument('--boxes_per_cell', default=3,      help='The number of the boxes in one cell')
-    parser.add_argument('--conf_thresh',    default=0.3,    help='confidence threshold')
-    parser.add_argument('--nms_thresh',     default=0.5,    help='NMS threshold')
-    parser.add_argument('--anchor_size', default=[[17,  25],[92,  206], [289, 311]],                    help='confidence threshold')
+    import time
+    from thop import profile
+    parser, args = parse_args()
 
-    args = parser.parse_args()
-    
     if args.cuda and torch.cuda.is_available():
         device = torch.device('cuda')
     else:
         device = torch.device('cpu')
 
-    input = torch.randn(1, 3, args.image_size, args.image_size)
+    input = torch.randn(1, 3, args.image_size, args.image_size).to(device)
 
-    model = YOLOv3(
-        device = device,
-        image_size=args.image_size,
-        nms_thresh=args.nms_thresh,
-        anchor_size = args.anchor_size,
-        num_classes=args.num_classes,
-        conf_thresh = args.conf_thresh,
-        boxes_per_cell=args.boxes_per_cell
-        )
-    model.trainable = True
+    model = YOLO(device = device,
+                 trainable= True,
+                 backbone = args.backbone,
+                 anchor_size = args.anchor_size,
+                 num_classes = args.num_classes,
+                 nms_threshold = args.nms_threshold,
+                 boxes_per_cell = args.boxes_per_cell,
+                 confidence_threshold = args.confidence_threshold
+                 ).to(device)
 
-    output = model(input)
-
-    pred_obj = torch.cat(output['pred_obj'], dim=1).view(-1)                      # [BM,]
-
-    print(output['pred_obj'][0].shape)
-    print(output['pred_cls'][1].shape)
-    print(output['pred_box'][2].shape)
+    outputs = model(input)
+    print(model)
+    
+    flops, params = profile(model, inputs=(input, ), verbose=False)
+    print('==============================')
+    print('GFLOPs : {:.2f}'.format(flops / 1e9 * 2))
+    print('Params : {:.2f} M'.format(params / 1e6))

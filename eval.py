@@ -1,33 +1,17 @@
 import os
-import cv2
 import torch
-import argparse
 import numpy as np
-from typing import List
+from model.yolo import YOLO
 from config import parse_args
-from model.yolov3 import YOLOv3
-
-import xml.etree.ElementTree as ET
 from dataset.fire import FIREDataset
 from dataset.augment import Augmentation
 
-def rescale_bboxes(bboxes, origin_size, ratio):
-    # rescale bboxes
-    if isinstance(ratio, float):
-        bboxes /= ratio
-    elif isinstance(ratio, List):
-        bboxes[..., [0, 2]] /= ratio[0]
-        bboxes[..., [1, 3]] /= ratio[1]
-        origin_size = [
-            origin_size[0]/ratio[0],
-            origin_size[1]/ratio[1]
-            ]
-    else:
-        raise NotImplementedError("ratio should be a int or List[int, int] type.")
-
-    # clip bboxes
-    bboxes[..., [0, 2]] = np.clip(bboxes[..., [0, 2]], a_min=0., a_max=origin_size[0])
-    bboxes[..., [1, 3]] = np.clip(bboxes[..., [1, 3]], a_min=0., a_max=origin_size[1])
+def rescale_bboxes(bboxes, std_size, ratio):
+    bboxes[..., [0, 2]] /= ratio[0]
+    bboxes[..., [1, 3]] /= ratio[1]
+    
+    bboxes[..., [0, 2]] = np.clip(bboxes[..., [0, 2]], a_min=0., a_max=(std_size[0] / ratio[0]))
+    bboxes[..., [1, 3]] = np.clip(bboxes[..., [1, 3]], a_min=0., a_max=(std_size[1] / ratio[1]))
 
     return bboxes
 
@@ -35,45 +19,24 @@ class Evaluator():
     """ VOC AP Evaluation class"""
     def __init__(self,
                  device,
-                 data_dir,
                  dataset,
-                 image_sets,
                  ovthresh,
                  class_names,
-                 recall_thre) -> None:
+                 recall_thre,
+                 visualization) -> None:
         
         self.device = device
-        self.data_dir = data_dir
         self.dataset = dataset
-        self.image_sets = image_sets
         self.ovthresh = ovthresh
-        self.class_names = class_names
-        self.num_classes = len(class_names)
         self.recall_thre = recall_thre
-        self.num_images = len(self.dataset)
-        # all_boxes[cls][image] = N x 5 array of detections in (x1, y1, x2, y2, score)
-        self.all_boxes = [[[] for _ in range(self.num_images)
-                          ] for _ in range(self.num_classes)
-                         ]
-
-    def parse_rec(self, filename):
-        """ Parse a PASCAL VOC xml file """
-        tree = ET.parse(filename)
-        objects = []
-        for obj in tree.findall('object'):
-            obj_struct = {}
-            obj_struct['name'] = obj.find('name').text
-            obj_struct['pose'] = obj.find('pose').text
-            obj_struct['truncated'] = int(obj.find('truncated').text)
-            obj_struct['difficult'] = int(obj.find('difficult').text)
-            bbox = obj.find('bndbox')
-            obj_struct['bbox'] = [int(bbox.find('xmin').text),
-                                int(bbox.find('ymin').text),
-                                int(bbox.find('xmax').text),
-                                int(bbox.find('ymax').text)]
-            objects.append(obj_struct)
-
-        return objects
+        self.class_names = class_names
+        self.visualization = visualization
+        self.num_classes = len(class_names)
+        
+        self.all_gt_boxes = [{} for _ in range(self.num_classes)]
+        self.all_det_boxes = [[[] for _ in range(len(self.dataset))
+                              ] for _ in range(self.num_classes)]
+        # all_det_boxes[cls][image] = N x 5 array of detections in (x1, y1, x2, y2, score)
 
     def voc_ap(self, recall, precision):
         """ 
@@ -95,93 +58,111 @@ class Evaluator():
         for i in range(mpre.size - 1, 0, -1):
             mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
             
-        # where X axis (recall) changes value， #excalidraw ,np.where()返回下标索引数组组成的元组
+        # where X axis (recall) changes value
         i = np.where(mrec[:-1] != mrec[1:])[0]     
 
         # and sum (\Delta recall) * prec
         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
         return ap
   
-    def inference(self, model, result_path):
-        for i in range(self.num_images):
-            img, target, deltas = self.dataset.__getitem__(i)
-            orig_h, orig_w = img.shape[1:]
+    def inference(self, model):
+        for i in range(len(self.dataset)):
+            image, target, deltas = self.dataset[i]
 
-            # preprocess
-            img = img.unsqueeze(0).to(self.device)
+            image = image.unsqueeze(0).to(self.device)
 
-            # forward
-            outputs = model(img)
+            outputs = model(image)
             scores = outputs['scores']
             labels = outputs['labels']
             bboxes = outputs['bboxes']
 
-            # rescale bboxes
-            bboxes = rescale_bboxes(bboxes, [orig_w, orig_h], deltas)
-
-            if len(bboxes) == 0:
-                continue
-            else:
-                show_img, _ = self.dataset.pull_image(i)
-                for index, box in enumerate(bboxes):
-                    cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[2]), int(box[3])), (255, 0, 0))
-
-                    class_colors = {
-                                                    'smoke': (255, 0, 0),       # 蓝色
-                                                    'fire': (0, 0, 255),            # 红色
-                                                }
-                    
-                    ind_to_cls = {
-                        0: 'fire',
-                        1: 'smoke'
-                    }
-
-                    label_name = ind_to_cls[labels[index]]
-                    score = scores[index]
-                    text = "%s:%s"%(label_name, str(round(float(score), 2)))
-                    (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
-                    cv2.rectangle(show_img, (int(box[0]), int(box[1])),  (int(box[0]) + w, int(box[1]) + h), class_colors[label_name], -1) 
-                    cv2.putText(show_img, text, (int(box[0]), int(box[1])+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
-                    
-
-                print(self.class_names[labels[0]], ":", scores)
-                cv2.imshow('1', show_img)
-                cv2.waitKey(0)
-
+            # rescale prediction bboxes
+            bboxes = rescale_bboxes(bboxes, list(image.shape[-2:]), deltas)
             for j in range(self.num_classes):
                 inds = np.where(labels == j)[0]
                 if len(inds) == 0:
-                    self.all_boxes[j][i] = np.empty([0, 5], dtype=np.float32)
+                    self.all_det_boxes[j][i] = np.empty([0, 5], dtype=np.float32)
                     continue
                 c_bboxes = bboxes[inds]
                 c_scores = scores[inds]
                 c_dets = np.hstack((c_bboxes, c_scores[:, np.newaxis])).astype(np.float32, copy=False)
-                self.all_boxes[j][i] = c_dets
+                self.all_det_boxes[j][i] = c_dets
+
+            # rescale grountruth targets
+            target['boxes'] = rescale_bboxes(target['boxes'], list(image.shape[-2:]), deltas)
+            for j in range(self.num_classes):
+                inds = np.where((target['labels'] == j) | (target['labels'] == j+0.1))[0]
+
+                if len(inds) == 0:
+                    self.all_gt_boxes[j][self.dataset.ids[i][1]] = np.array([], dtype=np.float32)
+                    continue
+                c_gt_bboxes = target['boxes'][inds]
+
+                frac, _ = np.modf(target['labels'][inds])
+                c_gt_diffcult = np.where(np.round(frac * 10) == 1, 1, 0)
+
+                c_gts = np.hstack((c_gt_bboxes, c_gt_diffcult[:, np.newaxis])).astype(np.float32, copy=False)
+                self.all_gt_boxes[j][self.dataset.ids[i][1]] = c_gts
             
-            print('Inference: {} / {}'.format(i+1, self.num_images), end='\r')
+            if self.visualization:
+                # TODO  Visualization Debug
+                if len(bboxes) == 0 and len(target['boxes']) == 0:
+                    continue
+                else:
+                    import cv2
+                    np.random.seed(0)
+                    class_colors = [(np.random.randint(255),
+                                    np.random.randint(255),
+                                    np.random.randint(255)) for _ in range(self.num_classes)]
+
+                    show_image, _ = self.dataset.pull_image(i)
+                    prediction_image = show_image.copy()
+                    groundtruth_image = show_image.copy()
+                    
+                    # prediction
+                    for index, box in enumerate(bboxes):
+                        text = "%s:%s"%(self.class_names[labels[index]], str(round(float(scores[index]), 2)))
+                        (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
+                        cv2.rectangle(prediction_image, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), class_colors[labels[index]])
+                        cv2.rectangle(prediction_image, (int(box[0]), int(box[1])),  (int(box[0]) + w, int(box[1]) + h), class_colors[labels[index]], -1) 
+                        cv2.putText(prediction_image, text, (int(box[0]), int(box[1])+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+                    cv2.rectangle(prediction_image, (0, 0),  (50, 20), (0,0,0), -1) 
+                    cv2.putText(prediction_image, 'DT', (5, 20), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+
+                    # groundtruth
+                    for index, box in enumerate(target['boxes']):
+                        text = self.class_names[int(target['labels'][index])]
+                        (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
+                        cv2.rectangle(groundtruth_image, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), class_colors[int(target['labels'][index])])
+                        cv2.rectangle(groundtruth_image, (int(box[0]), int(box[1])),  (int(box[0]) + w, int(box[1]) + h), class_colors[int(target['labels'][index])], -1) 
+                        cv2.putText(groundtruth_image, text, (int(box[0]), int(box[1])+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+                    cv2.rectangle(groundtruth_image, (0, 0),  (50, 20), (0,0,0), -1) 
+                    cv2.putText(groundtruth_image, 'GT', (5, 20), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+
+                    show_image = np.concatenate((groundtruth_image, prediction_image), axis=1)
+                    show_image = cv2.resize(show_image, (1600, 900))
+                    cv2.imshow('1', show_image)
+                    cv2.waitKey(0)
+
+            print('Inference: {} / {}'.format(i+1, len(self.dataset)), end='\r')
         
     def load_gt(self, classname):
         npos = 0
         gts = {}
 
-        self.imgsetpath = os.path.join(self.data_dir, self.image_sets+'.txt')
-        with open(self.imgsetpath, 'r') as f:
-            lines = f.readlines()
-        imagenames = [x.strip() for x in lines]
+        class_index = self.class_names.index(classname)
         
-        for imagename in imagenames:
-            annopath = self.parse_rec(os.path.join(self.data_dir, 'Annotations', '%s.xml')%(imagename))
-            bboxes = [ins for ins in annopath if ins['name'] == classname]
+        for image_id in self.all_gt_boxes[class_index]:
+            if len(self.all_gt_boxes[class_index][image_id]) == 0:
+                gts[image_id] = {}
+                continue
 
-            bbox = np.array([x['bbox'] for x in bboxes])
-            difficult = np.array([x['difficult'] for x in bboxes]).astype(bool)
-            det = [False] * len(bboxes)
-
-            npos = npos + sum(~difficult)
+            difficult = np.array([box[-1] for box in self.all_gt_boxes[class_index][image_id]]).astype(bool)
+            gts[image_id] = {'bbox': np.array(self.all_gt_boxes[class_index][image_id][:, :4]),
+                             'difficult': difficult,
+                             'det': [False] * len(self.all_gt_boxes[class_index][image_id])}
             
-            gts[imagename] = {'bbox': bbox,
-                              'difficult': difficult,
-                              'det': det}
+            npos = npos + sum(~difficult)
         
         return gts, npos
 
@@ -191,7 +172,7 @@ class Evaluator():
         bboxes = []
 
         class_index = self.class_names.index(classname)
-        for im_ind, dets in enumerate(self.all_boxes[class_index]):
+        for im_ind, dets in enumerate(self.all_det_boxes[class_index]):
             image_id = self.dataset.ids[im_ind][1]
             for k in range(dets.shape[0]):
                 image_ids.append(image_id)
@@ -205,13 +186,11 @@ class Evaluator():
         }
 
     def eval(self, model):
-        result_path = os.path.join(os.getcwd(), 'log')
-        self.inference(model, result_path)
+        self.inference(model)
         print('\n~~~~~~~~')
         print('Results:')
 
         aps = []
-        
         for cls_ind, cls_name in enumerate(self.class_names):
             dets = self.load_dets(cls_name)
             gts, npos = self.load_gt(cls_name)
@@ -227,8 +206,8 @@ class Evaluator():
 
                 for index, box in enumerate(sorted_bboxes):
                     gt_dic = gts[sorted_image_ids[index]]
-                    gt_boxes = gt_dic['bbox'].astype(float)
-                    if gt_boxes.size > 0:
+                    if 'bbox' in gt_dic:
+                        gt_boxes = gt_dic['bbox'].astype(float)
                         x_min = np.maximum(gt_boxes[:, 0], box[0])
                         y_min = np.maximum(gt_boxes[:, 1], box[1])
                         x_max = np.minimum(gt_boxes[:, 2], box[2])
@@ -249,6 +228,8 @@ class Evaluator():
                         if max_iou > self.ovthresh and gt_dic['det'][max_index] != 1:
                             tp[index] = 1
                             gt_dic['det'][max_index] = 1
+                            gt_cls_ind = cls_ind  # 真实类别的索引
+                            det_cls_ind = cls_ind  # 检测到的类别索引
                         else:
                             fp[index] = 1 
                     else:
@@ -278,7 +259,7 @@ class Evaluator():
             aps += [ap]
             
             print('{:<12} :     {:.3f}'.format(cls_name, ap))
-            # break
+
         self.map = np.mean(aps)
         print('')
         print('~~~~~~~~')
@@ -289,46 +270,48 @@ class Evaluator():
         return self.map
 
 if __name__ == "__main__":
-    args = parse_args()
-    
+    parser, args = parse_args()
 
     if args.cuda and torch.cuda.is_available():
         device = torch.device('cuda')
+        print('use cuda')
     else:
         device = torch.device('cpu')
 
-    val_trans = Augmentation(args.image_size, args.data_augment, is_train=False)
-    val_dataset = FIREDataset(data_dir     = args.data_root,
-                             image_sets   = args.datasets_val,
-                             transform    = val_trans,
-                             is_train     = False)
+    val_transformer = Augmentation(is_train=False, image_size=args.image_size, transforms=args.data_augment)
+    val_dataset = FIREDataset(is_train = False,
+                             data_dir = args.data_root,
+                             transform = val_transformer,
+                             image_set = args.val_dataset,
+                             classes = args.class_names,
+                             )
 
-    model = YOLOv3(device  =device,
-                   backbone = args.backbone,
-                   image_size   =args.image_size,
-                   nms_thresh   =args.threshold_nms,
-                   anchor_size = args.anchor_size,
-                   num_classes  =args.classes_number,
-                   conf_thresh  =args.threshold_conf,
-                   boxes_per_cell=args.boxes_per_cell
-                   ).to(device)
+    model = YOLO(device = device,
+                 trainable = False,
+                 backbone = args.backbone,
+                 anchor_size = args.anchor_size,
+                 num_classes = args.num_classes,
+                 nms_threshold = args.nms_threshold,
+                 boxes_per_cell = args.boxes_per_cell,
+                 confidence_threshold = args.confidence_threshold
+                 ).eval().to(device)
+
+    state_dict = torch.load(
+                            f = os.path.join('log', args.model_weight_path), 
+                            map_location = 'cpu', 
+                            weights_only = False)
+    print('mAP:', state_dict['mAP'])
     
+    model.load_state_dict(state_dict["model"])
 
-    ckpt_path = os.path.join(os.getcwd(), 'log', args.weight)
-    state_dict = torch.load(ckpt_path, map_location='cpu', weights_only=False)["model"]
-    model.load_state_dict(state_dict)
-    model.trainable = False
-    model.eval()
     
     evaluator = Evaluator(
-        device   =device,
-        data_dir = args.data_root,
+        device   = device,
         dataset  = val_dataset,
-        image_sets = args.datasets_val,
-        ovthresh    = args.threshold_nms,                        
+        ovthresh = args.nms_threshold,                        
         class_names = args.class_names,
-        recall_thre = args.threshold_recall,
-        )
+        recall_thre = args.recall_threshold,
+        visualization = args.eval_visualization)
 
-   # VOC evaluation
+    # VOC evaluation
     map = evaluator.eval(model)

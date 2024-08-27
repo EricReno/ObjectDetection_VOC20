@@ -8,18 +8,18 @@ class Loss(object):
                  num_classes,
                  anchor_size,
                  boxes_per_cell,
-                 loss_box_weight,
-                 loss_obj_weight,
-                 loss_cls_weight
+                 bbox_loss_weight,
+                 objectness_loss_weight,
+                 class_loss_weight
                  ):
          
         self.device = device
         self.num_classes = num_classes
         self.anchor_size = anchor_size
         self.boxes_per_cell = boxes_per_cell
-        self.loss_box_weight = loss_box_weight
-        self.loss_obj_weight = loss_obj_weight
-        self.loss_cls_weight = loss_cls_weight
+        self.bbox_loss_weight = bbox_loss_weight
+        self.objectness_loss_weight = objectness_loss_weight
+        self.class_loss_weight = class_loss_weight
         self.anchor_boxes = np.array([[0., 0., anchor[0], anchor[1]] for anchor in anchor_size])  
     
     def compute_iou(self, anchor_boxes, gt_box):
@@ -208,9 +208,9 @@ class Loss(object):
         loss_obj = loss_obj.sum() / num_fgs
 
         # total loss
-        losses = self.loss_obj_weight * loss_obj + \
-                 self.loss_cls_weight * loss_cls + \
-                 self.loss_box_weight * loss_box
+        losses = self.objectness_loss_weight * loss_obj + \
+                 self.class_loss_weight * loss_cls + \
+                 self.bbox_loss_weight * loss_box
                  
         return dict(
                 loss_obj = loss_obj,
