@@ -10,14 +10,11 @@ fps = []
 def parse_args():
     parser = argparse.ArgumentParser(description='Inference VOC20')
     parser.add_argument('--cuda', default=True, help='Use CUDA for inference.')
-    parser.add_argument('--onnx', default='yolo_darknet53.onnx', help='Path to the ONNX model file.')
+    parser.add_argument('--onnx', default='141.onnx', help='Path to the ONNX model file.')
     parser.add_argument('--image_size', default=608, type=int, help='Input image size.')
     parser.add_argument('--confidence', default=0.3, type=float, help='Confidence threshold for object detection.')
     parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold.')
-    parser.add_argument('--class_names', nargs='+', default=['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 
-                                                             'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 
-                                                             'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 
-                                                             'train', 'tvmonitor'], help='List of class names.')
+    parser.add_argument('--class_names', nargs='+', default=['fire', 'smoke'], help='List of class names.')
     return parser.parse_args()
 
 def setup_inference(args):
@@ -153,7 +150,7 @@ def main():
         display_fps(image, start_time, end_time)
 
         cv2.imshow('image', image)
-        if cv2.waitKey(1) == ord('q'):
+        if cv2.waitKey(0) == ord('q'):
             break
 
     cap.release()
