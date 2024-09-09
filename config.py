@@ -27,21 +27,21 @@ def parse_args():
                         default=[('2007', 'test')],
                         help='Dataset split used for validation (format: [(year, split)]).')
     
-
     # Data augmentation
     parser.add_argument('--data_augment',
-                        default=['RandomSaturationHue', 'RandomContrast', 'RandomBrightness', 'RandomSampleCrop', 'RandomExpand', 'RandomHorizontalFlip'],
+                        default= 'ssd',
+                        choices = ['ssd', 'yolo'],
                         help='List of data augmentation techniques applied during training.')
 
     # Model settings
     parser.add_argument('--backbone', 
-                        default='cspdarknet_tiny',
+                        default='darknet_tiny',
                         type=str,
                         choices=['darknet_53', 'darknet_tiny',
                                  'cspdarknet_53', 'cspdarknet_tiny'],
                         help='Backbone network architecture.')
     parser.add_argument('--neck', 
-                        default='csp_sppf',
+                        default='sppf',
                         type=str,
                         choices=['sppf', 'csp_sppf'],
                         help='Neck network architecture.')

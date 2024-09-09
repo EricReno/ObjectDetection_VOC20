@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from config import parse_args
 from model.build import build_yolo
-from dataset.build import build_augment, build_dataset
+from dataset.build import build_transform, build_dataset
 
 def rescale_bboxes(bboxes, std_size, ratio):
     bboxes[..., [0, 2]] /= ratio[0]
@@ -296,7 +296,7 @@ if __name__ == "__main__":
         device = torch.device('cpu')
 
 
-    val_transformer = build_augment(args, is_train=False)
+    val_transformer = build_transform(args, is_train=False)
     val_dataset = build_dataset(args, False, val_transformer, args.val_dataset)
 
 

@@ -11,7 +11,7 @@ from utils.flops import compute_flops
 from utils.criterion import build_loss
 from utils.optimizer import build_optimizer
 from utils.lr_scheduler import build_lambda_lr_scheduler
-from dataset.build import build_augment, build_dataset, build_dataloader
+from dataset.build import build_transform, build_dataset, build_dataloader
 
 def train():
     args = parse_args()
@@ -25,8 +25,8 @@ def train():
         device = torch.device('cpu')
 
     # ---------------------------- Build --------------------------
-    val_transformer = build_augment(args, is_train=False)
-    train_transformer = build_augment(args, is_train=True)
+    val_transformer = build_transform(args, is_train=False)
+    train_transformer = build_transform(args, is_train=True)
 
     val_dataset = build_dataset(args, False, val_transformer, args.val_dataset)
     train_dataset = build_dataset(args, True, train_transformer, args.train_dataset)

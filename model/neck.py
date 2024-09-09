@@ -59,18 +59,6 @@ class SPPFBlockCSP(nn.Module):
         return y
      
 def build_neck(neck_cfg, feat_dim):
-    neck = SPPF(
-        in_dim=feat_dim,
-        out_dim=feat_dim,
-        expand_ratio=0.5, 
-        pooling_size=5,
-        act_type='silu',
-        norm_type='BN'
-    )
-    
-    return neck
-
-def build_neck(neck_cfg, feat_dim):
     if neck_cfg == 'sppf':
         neck = SPPF(
             in_dim=feat_dim,

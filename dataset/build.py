@@ -1,7 +1,8 @@
 import torch
 from .voc import VOCDataset
 from .utils import CollateFunc
-from .augment import Augmentation
+from .augment.ssd_augment import SSDAugmentation
+from .augment.yolo_augment import YOLOAugmentation
 
 def build_dataset(args, is_train, transformer, image_set):
     if not is_train :
@@ -17,14 +18,13 @@ def build_dataset(args, is_train, transformer, image_set):
                           )
     return datasets
     
-def build_augment(args, is_train):
-    augment = Augmentation(
-                           is_train=is_train, 
-                           image_size=args.image_size, 
-                           transforms=args.data_augment
-                           )
+def build_transform(args, is_train):
+    if args.data_augment == 'ssd':
+        transform = SSDAugmentation(is_train=is_train, image_size=args.image_size)
+    elif args.data_augment == 'yolo':
+        transform = YOLOAugmentation(is_train=is_train, image_size=args.image_size, max_stride=32)
 
-    return augment
+    return transform
 
 def build_dataloader(args, dataset):
     sampler = torch.utils.data.RandomSampler(dataset)

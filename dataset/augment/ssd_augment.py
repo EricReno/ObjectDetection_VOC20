@@ -258,30 +258,26 @@ class RandomSaturationHue(object):
 
         return image, boxes, labels
 
-class Augmentation():
+class SSDAugmentation():
     def __init__(self, 
                  is_train = True,
                  image_size = 608, 
-                 transforms = None, 
                  ) -> None:
 
         self.is_train = is_train
         self.image_size = image_size
 
-        self.transforms = []
-        augments = {
-            'RandomContrast'      : RandomContrast(),
-            'RandomBrightness'    : RandomBrightness(),
-            'RandomSaturationHue' : RandomSaturationHue(),
+        self.transforms = [
+            RandomContrast(),
+            RandomBrightness(),
+            RandomSaturationHue(),
 
-            'RandomExpand'        : RandomExpand(),
-            'RandomSampleCrop'    : RandomSampleCrop(),
-            'RandomHorizontalFlip': RandomHorizontalFlip(),
-        }
-        for t in transforms:
-            self.transforms.append(augments[t])
-    
-    def __call__(self, image, target = None):   
+            RandomExpand(),
+            RandomSampleCrop(),
+            RandomHorizontalFlip()
+        ]
+
+    def __call__(self, image, target = None, mosaic=False):   
         image = image.astype(np.float32).copy()
         boxes = target['boxes'].copy()
         labels = target['labels'].copy()

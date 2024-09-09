@@ -1,12 +1,9 @@
 # Yolo_V3 (You only look once)
 
-- yolo_v3的pytorch源码，含训练、推理、评测、部署脚本，论文传送门：
+- yolo系列的pytorch源码学习，已更新至yolov4，含训练、推理、评测、部署脚本
+- 论文传送门：
 
-https://arxiv.org/abs/1506.02640 (v1)
-
-https://arxiv.org/abs/1612.08242 (v2)
-
-https://arxiv.org/abs/1804.02767 (v3)
+https://arxiv.org/abs/2004.10934 (v4)
 
 ## 数据集: VOC 
 - **test**: (VOC2007, test) : 4952
@@ -28,7 +25,7 @@ https://arxiv.org/abs/1804.02767 (v3)
 
 
 ## 通用设置
-|DataAugmentation    |
+
 |:---:               |
 |RandomSaturationHue |
 |RandomContrast      |
@@ -37,18 +34,18 @@ https://arxiv.org/abs/1804.02767 (v3)
 |RandomExpand        |
 |RandomHorizontalFlip|
 
-|BS   |Pretrained|Epoch|Obj_loss|Cls_loss|Box_loss|NMS_th|Confidence|APT  |LearningRate|Lr_scheduler|
-|:---:|:---:     |:---:|:---:   |:---:   |:---:   |:---: |:---:     |:---:|:---:       |:---:       |
-|  64 |CoCo      |160  |1.0     | 1.0    | 5.0    |0.5   |0.3       |SGD  |0.01        |linear      |
+|BS   |Pretrained|Epoch|Obj_loss|Cls_loss|Box_loss|NMS_th|Confidence|APT  |LearningRate|Lr_scheduler|DataAugmentation|
+|:---:|:---:     |:---:|:---:   |:---:   |:---:   |:---: |:---:     |:---:|:---:       |:---:       |:---:       |
+|  64 |CoCo      |160  |1.0     | 1.0    | 5.0    |0.5   |0.3       |SGD  |0.01        |linear      |SSD|
 
 ## Results:
 |TAG              |Size |mAP   |GFLOPs|Params|Pt_Size|FPS-3060|
 |:---:            |:---:|:---: |:---: |:---: |:---:  |:---:   |
-|Yolo_v3_Tiny     |512  |65.71%|  4.56|  2.39|  18.4M| 77.1141|
-|Yolo_v3_Darknet53|512  |75.71%|133.40| 57.43|   442M|  5.0489|
+|Yolo_v4_CSPTiny     |512  |65.71%|  4.56|  2.39|  18.4M| 77.1141|
+|Yolo_v4_CSPDarknet53|512  |75.71%|133.40| 57.43|   442M|  5.0489|
 
 <table>
-<tr><th>Yolo_v3_Tiny</th> <th>Yolo_v3_Darknet53</th></tr>
+<tr><th>Yolo_v4_Tiny</th> <th>Yolo_v4_Darknet53</th></tr>
 <tr>
 <td>
     

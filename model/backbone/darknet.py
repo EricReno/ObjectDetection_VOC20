@@ -195,7 +195,7 @@ def build_backbone(model_name, pretrained):
     elif model_name == 'darknet_tiny':
         backbone = DarkNetTiny()
         feat_dims = backbone.feat_dims
-    elif model_name == 'cspdarknet53':
+    elif model_name == 'cspdarknet_53':
         backbone = CSPDarkNet53()
         feat_dims = backbone.feat_dims
     elif model_name == 'cspdarknet_tiny':
@@ -236,7 +236,7 @@ if __name__ == "__main__":
 
     input = torch.randn(1, 3, 608, 608)
 
-    # darknet_tiny or darknet53
+    # darknet_tiny or darknet_53
     model, _ = build_backbone(model_name='cspdarknet_tiny', pretrained=True)
     
     t0 = time.time()
