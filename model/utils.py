@@ -89,6 +89,25 @@ class ConvBlocks(nn.Module):
     def forward(self, x):
         return self.convs(x)
 
+# ResBlock
+class ResBlock(nn.Module):
+    def __init__(self,
+                 in_dim,
+                 out_dim,
+                 nblocks=1,
+                 act_type='silu',
+                 norm_type='BN'):
+        super(ResBlock, self).__init__()
+        assert in_dim == out_dim
+        self.m = nn.Sequential(*[
+            Bottleneck(in_dim, out_dim, expand_ratio=0.5, shortcut=True,
+                       norm_type=norm_type, act_type=act_type)
+                       for _ in range(nblocks)
+                       ])
+
+    def forward(self, x):
+        return self.m(x)
+    
 # CSPBlock
 class CSPBlock(nn.Module):
     def __init__(self,
@@ -117,3 +136,4 @@ class CSPBlock(nn.Module):
         x3 = self.m(x1)
         out = self.cv3(torch.cat([x3, x2], dim=1))
         return out
+    

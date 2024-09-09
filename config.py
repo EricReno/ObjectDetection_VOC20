@@ -9,7 +9,7 @@ def parse_args():
                         help='Enable CUDA for GPU acceleration.')   
 
     parser.add_argument('--num_workers',  
-                        default=4,
+                        default=16,
                         type=int,
                         help='Number of CPU threads to use during data loading.')             
     
@@ -35,14 +35,15 @@ def parse_args():
 
     # Model settings
     parser.add_argument('--backbone', 
-                        default='darknet_tiny',
+                        default='cspdarknet_tiny',
                         type=str,
-                        choices=['darknet_53', 'darknet_tiny'],
+                        choices=['darknet_53', 'darknet_tiny',
+                                 'cspdarknet_53', 'cspdarknet_tiny'],
                         help='Backbone network architecture.')
     parser.add_argument('--neck', 
-                        default='sppf',
+                        default='csp_sppf',
                         type=str,
-                        choices=['sppf'],
+                        choices=['sppf', 'csp_sppf'],
                         help='Neck network architecture.')
     parser.add_argument('--fpn', 
                         default='pafpn',
