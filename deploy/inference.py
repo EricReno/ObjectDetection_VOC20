@@ -10,8 +10,8 @@ fps = []
 def parse_args():
     parser = argparse.ArgumentParser(description='Inference VOC20')
     parser.add_argument('--cuda', default=True, help='Use CUDA for inference.')
-    parser.add_argument('--onnx', default='yolo_darknet53.onnx', help='Path to the ONNX model file.')
-    parser.add_argument('--image_size', default=608, type=int, help='Input image size.')
+    parser.add_argument('--onnx', default='yolo_darknet_tiny.onnx', help='Path to the ONNX model file.')
+    parser.add_argument('--image_size', default=512, type=int, help='Input image size.')
     parser.add_argument('--confidence', default=0.3, type=float, help='Confidence threshold for object detection.')
     parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold.')
     parser.add_argument('--class_names', nargs='+', default=['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 
@@ -29,19 +29,20 @@ def generate_colors(num_classes):
     numpy.random.seed(0)
     return [tuple(numpy.random.randint(255, size=3).tolist()) for _ in range(num_classes)]
 
-def display_fps(image, start_time, end_time):
-    fps = f"fps:{round(1 / (end_time - start_time), 2)}"
+def display_fps(image, time):
+    fps = f"fps:{round(1 / (time), 2)}"
     cv2.putText(image, fps, (0, 20), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 0), 1)
 
 def draw_bboxes(image, bboxes, labels, scores, class_names, class_colors):
-    for i, bbox in enumerate(bboxes):
-        label = class_names[labels[i]]
-        color = class_colors[labels[i]]
+    for index, bbox in enumerate(bboxes):
         bbox = [int(point) for point in bbox]
-        text = f"{label}:{round(float(scores[i]), 2)}"
 
-        cv2.rectangle(image, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 1)
-        cv2.putText(image, text, (bbox[0], bbox[1] + 20), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
+        text = "%s:%s"%(class_names[labels[index]], str(round(float(scores[index]), 2)))
+        (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
+
+        cv2.rectangle(image, (bbox[0], bbox[1]), (bbox[2], bbox[3]), class_colors[labels[index]])
+        cv2.rectangle(image, (bbox[0], bbox[1]), (bbox[0] + w, bbox[1] + h), class_colors[labels[index]], -1) 
+        cv2.putText(image, text, (bbox[0], bbox[1]+h), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
 
 def nms(bboxes, scores, nms_thresh):
     """"Pure Python NMS."""
@@ -149,8 +150,8 @@ def main():
         labels, scores, bboxes = postinfer(postinfer_input, ratio, args.image_size, args.class_names, args.confidence, args.nms_thresh)
         end_time = time.time()
 
+        # display_fps(image, end_time-start_time)
         draw_bboxes(image, bboxes, labels, scores, args.class_names, class_colors)
-        display_fps(image, start_time, end_time)
 
         cv2.imshow('image', image)
         if cv2.waitKey(1) == ord('q'):

@@ -1,4 +1,3 @@
-## collate_fn for dataloader
 import torch
 
 class CollateFunc(object):

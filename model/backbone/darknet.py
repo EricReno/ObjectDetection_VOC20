@@ -143,7 +143,7 @@ class DarkNetTiny(nn.Module):
 
 model_urls = {
     "darknet_tiny": "https://github.com/EricReno/ImageClassification/releases/download/weight/darknet_tiny.pth",
-    "darknet53": "https://github.com/EricReno/ImageClassification/releases/download/weight/darknet53_silu.pth",
+    "darknet53": "https://github.com/EricReno/ImageClassification/releases/download/weight/darknet53.pth",
 }
 
 def build_backbone(model_name, pretrained):

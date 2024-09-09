@@ -1,3 +1,9 @@
-numpy==1.26.4
+numpy==1.24.4
+onnx==1.13.1
+onnxruntime==1.18.0
+onnxruntime_gpu==1.18.1
+opencv_contrib_python_headless==4.7.0.72
 opencv_python==4.7.0.68
-torch==2.3.0
+opencv_python_headless==4.10.0.84
+torch==2.4.0
+ultralytics_thop==0.2.8

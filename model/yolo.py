@@ -11,6 +11,7 @@ sys.path.append(pro_path)
 from config import parse_args
 from model.head import Decouple
 from model.neck import build_neck
+from model.fpn import build_fpn
 from model.backbone.darknet import build_backbone
 
 class YOLO(nn.Module):
@@ -18,6 +19,8 @@ class YOLO(nn.Module):
                  device,
                  trainable,
                  backbone,
+                 neck,
+                 fpn,
                  anchor_size,
                  num_classes,
                  nms_threshold,
@@ -38,21 +41,25 @@ class YOLO(nn.Module):
 
         self.backbone, feat_dims = build_backbone(backbone, pretrained=trainable)
         
-        self.neck, feat_dims = build_neck(feat_dims)
+        # SPP --> only last one
+        self.neck = build_neck(neck, feat_dims[-1])
+
+        # 特征金字塔
+        self.fpn, feat_dims = build_fpn(backbone, fpn, feat_dims)
 
         self.heads = nn.ModuleList(
             [Decouple(dim) for dim in feat_dims]
         )
         
-        self.obj_pred = nn.ModuleList(
+        self.obj_preds = nn.ModuleList(
             [nn.Conv2d(dim, 1*self.boxes_per_cell, kernel_size=1) for dim in feat_dims]
         )
         
-        self.cls_pred = nn.ModuleList(
+        self.cls_preds = nn.ModuleList(
             [nn.Conv2d(dim, self.num_classes*self.boxes_per_cell, kernel_size=1) for dim in feat_dims]
         )
         
-        self.reg_pred = nn.ModuleList(
+        self.reg_preds = nn.ModuleList(
             [nn.Conv2d(dim, 4*self.boxes_per_cell, kernel_size=1) for dim in feat_dims]
         )
 
@@ -213,9 +220,12 @@ class YOLO(nn.Module):
 
     @torch.no_grad()
     def inference(self, x):
-        backbone_feats = self.backbone(x) # [1, 3, 416, 416] --> [1, 256, 52, 52], [1, 512, 26, 26], [1, 1024, 13, 13]
+        pyramid_feats = self.backbone(x) 
 
-        pyramid_feats = self.neck(backbone_feats) # --> [torch.Size([1, 128, 52, 52]), torch.Size([1, 256, 26, 26]), torch.Size([1, 512, 13, 13])]
+        pyramid_feats[-1] = self.neck(pyramid_feats[-1])
+
+        pyramid_feats = self.fpn(pyramid_feats) 
+
         
         all_anchors = []
         all_obj_preds = []
@@ -225,9 +235,9 @@ class YOLO(nn.Module):
         for level, (feat, head) in enumerate(zip(pyramid_feats, self.heads)):
             cls_feat, reg_feat = head(feat)
 
-            obj_pred = self.obj_pred[level](reg_feat)
-            cls_pred = self.cls_pred[level](cls_feat)
-            reg_pred = self.reg_pred[level](reg_feat)
+            obj_pred = self.obj_preds[level](reg_feat)
+            cls_pred = self.cls_preds[level](cls_feat)
+            reg_pred = self.reg_preds[level](reg_feat)
 
             # anchors: [M, 2]
             fmp_size = obj_pred.shape[-2:]
@@ -273,11 +283,11 @@ class YOLO(nn.Module):
         else:
             batch_size = x.shape[0]
 
-            # [1, 3, 416, 416] --> [[1, 256, 52, 52], [1, 512, 26, 26], [1, 1024, 13, 13]]
-            backbone_feats = self.backbone(x) 
-            
-            # --> [torch.Size([1, 128, 52, 52]), torch.Size([1, 256, 26, 26]), torch.Size([1, 512, 13, 13])]
-            pyramid_feats = self.neck(backbone_feats) 
+            pyramid_feats = self.backbone(x) 
+
+            pyramid_feats[-1] = self.neck(pyramid_feats[-1])
+
+            pyramid_feats = self.fpn(pyramid_feats) 
 
             all_fmp_sizes = []
             all_obj_preds = []
@@ -286,9 +296,9 @@ class YOLO(nn.Module):
             for level, (feat, head) in enumerate(zip(pyramid_feats, self.heads)):
                 cls_feat, reg_feat = head(feat)
 
-                obj_pred = self.obj_pred[level](reg_feat)
-                cls_pred = self.cls_pred[level](cls_feat)
-                reg_pred = self.reg_pred[level](reg_feat)
+                obj_pred = self.obj_preds[level](reg_feat)
+                cls_pred = self.cls_preds[level](cls_feat)
+                reg_pred = self.reg_preds[level](reg_feat)
 
                 fmp_size = obj_pred.shape[-2:]
 

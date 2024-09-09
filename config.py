@@ -9,7 +9,7 @@ def parse_args():
                         help='Enable CUDA for GPU acceleration.')   
 
     parser.add_argument('--num_workers',  
-                        default=24,
+                        default=4,
                         type=int,
                         help='Number of CPU threads to use during data loading.')             
     
@@ -31,18 +31,27 @@ def parse_args():
     # Data augmentation
     parser.add_argument('--data_augment',
                         default=['RandomSaturationHue', 'RandomContrast', 'RandomBrightness', 'RandomSampleCrop', 'RandomExpand', 'RandomHorizontalFlip'],
-                        choices = ['RandomSaturationHue', 'RandomContrast', 'RandomBrightness', 'RandomSampleCrop', 'RandomExpand', 'RandomHorizontalFlip'],
                         help='List of data augmentation techniques applied during training.')
 
     # Model settings
     parser.add_argument('--backbone', 
-                        default='darknet53',
+                        default='darknet_tiny',
                         type=str,
-                        choices=['darknet53', 'darknet_tiny'],
+                        choices=['darknet_53', 'darknet_tiny'],
                         help='Backbone network architecture.')
+    parser.add_argument('--neck', 
+                        default='sppf',
+                        type=str,
+                        choices=['sppf'],
+                        help='Neck network architecture.')
+    parser.add_argument('--fpn', 
+                        default='pafpn',
+                        type=str,
+                        choices=['fpn', 'pafpn'],
+                        help='Feature Pyramid Network (FPN) architecture.')
     
     parser.add_argument('--image_size',
-                        default=608,
+                        default=512,
                         type=int,
                         help='Input image size.')
     
@@ -54,6 +63,7 @@ def parse_args():
     parser.add_argument('--class_names',
                         default=['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 
                                  'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'],          
+                        type=str,
                         help='List of class names.')
 
     parser.add_argument('--anchor_size', 
@@ -69,7 +79,7 @@ def parse_args():
 
     # Training settings
     parser.add_argument('--batch_size',
-                        default=4,
+                        default=64,
                         type=int,
                         help='Batch size used during training (per GPU).')
     
@@ -79,45 +89,34 @@ def parse_args():
                         help='Total number of training epochs.')
     
     parser.add_argument('--warmup_epochs',
-                        default=1,
+                        default=3,
                         type=int,
                         help='Number of warm-up epochs.')
     
-    parser.add_argument('--second_stage_epochs',
-                        default=60,
-                        type=int,
-                        help='Number of epochs in the second stage of training.')
-    
-    parser.add_argument('--third_stage_epochs',
-                        default=90,
-                        type=int,
-                        help='Number of epochs in the third stage of training.')
-
     parser.add_argument('--save_checkpoint_epoch',
                         default=0,
                         type=int,
                         help='Epoch interval to save model checkpoints.')
     
-    # Learning rate settings
+    # Optimizer settings
+    parser.add_argument('--optimizer',             
+                        default='sgd',
+                        type=str,
+                        help='Base learning rate.')
+    
+    parser.add_argument('--lr_scheduler',             
+                        default='linear',
+                        type=str,
+                        help='Base learning rate.')
+    
+    parser.add_argument('--grad_accumulate', 
+                        default=1, type=int,
+                        help='gradient accumulation')
+    
     parser.add_argument('--learning_rate',             
                         default=0.01,
                         type=float,
                         help='Base learning rate.')
-    
-    parser.add_argument('--warmup_learning_rate',
-                        default=0.00001,
-                        type=float,
-                        help='Learning rate during warm-up phase.')
-    
-    parser.add_argument('--second_stage_lr',
-                        default=0.001,
-                        type=float,
-                        help='Learning rate during the second stage of training.')
-    
-    parser.add_argument('--third_stage_lr',
-                        default=0.0001,
-                        type=float,
-                        help='Learning rate during the third stage of training.')
     
     parser.add_argument('--momentum',
                         default=0.9,
@@ -163,18 +162,18 @@ def parse_args():
     
     # Model checkpoint
     parser.add_argument('--model_weight_path',         
-                        default='yolo_darknet53.pth',                
+                        default='yolo_darknet_53.pth',                
                         type=str,
                         help='Path to the initial model weights.')
 
     parser.add_argument('--resume_weight_path',         
-                        default=None,                
+                        default='None',                
                         type=str,
                         help='Path to the checkpoint from which to resume training.')
     
     parser.add_argument('--eval_visualization',         
-                        default=True,                
+                        default=False,                
                         type=bool,
-                        help='')
+                        help='Whether to visualize the evaluation results.')
 
-    return parser, parser.parse_args()
+    return parser.parse_args()

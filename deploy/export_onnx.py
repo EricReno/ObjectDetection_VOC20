@@ -1,18 +1,13 @@
 import os
 import sys
-cur = os.path.dirname(os.path.abspath(__file__))
-pro_path = os.path.abspath(os.path.join(cur, '..'))
-sys.path.append(pro_path)
-
 import onnx
 import torch
-from model.yolo import YOLO
+sys.path.append('../')
 from config import parse_args
+from model.build import build_yolo
 
 def export(input, model, weight_name):
-    weight_path = os.path.join('log', weight_name)
-    model.deploy = True
-    model.trainable = False
+    weight_path = os.path.join(os.getcwd().replace('deploy', 'log'), weight_name)
     pt_onnx = weight_path.replace('.pth', '.onnx')
 
     state_dict = torch.load(weight_path, 
@@ -41,19 +36,13 @@ def export(input, model, weight_name):
         print("Model correct")
 
 if __name__ == "__main__":
-    parser, args = parse_args()
+    args = parse_args()
+    args.resume_weight_path = 'None'
 
-    x = torch.randn(1, 3, 608, 608)
+    x = torch.randn(1, 3, 512, 512)
 
-    model = YOLO(device = torch.device('cpu'),
-                 trainable =  False,
-                 backbone = args.backbone,
-                 anchor_size = args.anchor_size,
-                 num_classes = args.num_classes,
-                 nms_threshold = args.nms_threshold,
-                 boxes_per_cell = args.boxes_per_cell,
-                 confidence_threshold = args.confidence_threshold
-                 ).eval()
-    
-    
+    model = build_yolo(args, torch.device('cpu'), False)
+    model = model.eval()
+    model.deploy = True
+   
     export(x, model, args.model_weight_path)

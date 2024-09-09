@@ -1,55 +1,32 @@
 import torch
 import torch.nn as nn
 from model.utils import Conv
-import torch.nn.functional as F
 
-class FPN(nn.Module):
-    def __init__(self, feat_dims):
-        super(FPN, self).__init__()
+class SPPF(nn.Module):
+    def __init__(self, in_dim, out_dim, expand_ratio=0.5, pooling_size=5, act_type='lrelu', norm_type='BN'):
+        super().__init__()
+        inter_dim = int(in_dim * expand_ratio)
+        self.out_dim = out_dim
+        self.cv1 = Conv(in_dim, inter_dim, k=1, act_type=act_type, norm_type=norm_type)
+        self.cv2 = Conv(inter_dim * 4, out_dim, k=1, act_type=act_type, norm_type=norm_type)
+        self.m = nn.MaxPool2d(kernel_size=pooling_size, stride=1, padding=pooling_size // 2)
 
-        self.conv1 = nn.Sequential(
-            Conv(c1=feat_dims[-3] + feat_dims[-2]//4, c2=feat_dims[-3]//2, k=1, p=0, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-3]//2, c2=feat_dims[-3]//4, k=3, p=1, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-3]//4, c2=feat_dims[-3]//2, k=1, p=0, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-3]//2, c2=feat_dims[-3]//4, k=3, p=1, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-3]//4, c2=feat_dims[-3]//2, k=1, p=0, s=1, act_type='silu', norm_type='BN'),
-        )
+    def forward(self, x):
+        x = self.cv1(x)
+        y1 = self.m(x)
+        y2 = self.m(y1)
+        y3 = self.m(y2)
 
-            
-        self.conv2 = nn.Sequential(
-            Conv(c1=feat_dims[-2] + feat_dims[-1]//4, c2=feat_dims[-2]//2, k=1, p=0, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-2]//2, c2=feat_dims[-2]//4, k=3, p=1, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-2]//4, c2=feat_dims[-2]//2, k=1, p=0, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-2]//2, c2=feat_dims[-2]//4, k=3, p=1, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-2]//4, c2=feat_dims[-2]//2, k=1, p=0, s=1, act_type='silu', norm_type='BN'),
-        )
-        self.conv2_1 = Conv(c1=feat_dims[-2]//2, c2=feat_dims[-2]//4, k=1, p=0, s=1, act_type='silu', norm_type='BN')
-
-
-        self.conv3 = nn.Sequential(
-            Conv(c1=feat_dims[-1], c2=feat_dims[-1]//2, k=1, p=0, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-1]//2, c2=feat_dims[-1]//4, k=3, p=1, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-1]//4, c2=feat_dims[-1]//2, k=1, p=0, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-1]//2, c2=feat_dims[-1]//4, k=3, p=1, s=1, act_type='silu', norm_type='BN'),
-            Conv(c1=feat_dims[-1]//4, c2=feat_dims[-1]//2, k=1, p=0, s=1, act_type='silu', norm_type='BN'),
-        )
-        self.conv3_1 = Conv(c1=feat_dims[-1]//2, c2=feat_dims[-1]//4, k=1, p=0, s=1, act_type='silu', norm_type='BN')
-
-    def forward(self, features):
-        x1, x2, x3 = features
-
-        f3 = self.conv3(x3)
-
-        f3_up = F.interpolate(self.conv3_1(f3), scale_factor=2.0)
-        f2 = self.conv2(torch.cat([f3_up, x2], dim=1))
-
-        f2_up = F.interpolate(self.conv2_1(f2), scale_factor=2.0)
-        f1 = self.conv1(torch.cat([f2_up, x1], dim=1))
-
-        return [f1, f2, f3]
-
-def build_neck(feat_dims):
-    neck = FPN(feat_dims)
-    dims = [dim//2 for dim in feat_dims]
-
-    return neck, dims
+        return self.cv2(torch.cat((x, y1, y2, y3), 1))
+    
+def build_neck(neck_cfg, feat_dim):
+    neck = SPPF(
+        in_dim=feat_dim,
+        out_dim=feat_dim,
+        expand_ratio=0.5, 
+        pooling_size=5,
+        act_type='silu',
+        norm_type='BN'
+    )
+    
+    return neck
