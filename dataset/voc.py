@@ -1,8 +1,10 @@
 import os
 import cv2
+import random
 import numpy as np
 import torch.utils.data as data
 import xml.etree.ElementTree as ET
+from .augment.strong_augment import MixupAugment, MosaicAugment
 
 # VOC_CLASSES = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 
 #                'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 
@@ -10,6 +12,7 @@ import xml.etree.ElementTree as ET
 
 class VOCDataset(data.Dataset):
     def __init__(self,
+                 img_size,
                  is_train :bool = False,
                  data_dir :str = None, 
                  transform = None,
@@ -34,14 +37,33 @@ class VOCDataset(data.Dataset):
             for line in open(os.path.join(rootpath, 'ImageSets', 'Main', name+'.txt')):
                 self.ids.append((rootpath, line.strip()))
         
-        # if mosaic_augment:
-        #     self.mosaic_prob = 1.0
-        #     self.mixup_prob = 0.15
-            # self.mosaic_augment = MosaicAugment(img_size, trans_config, is_train) if self.mosaic_prob > 0. else None
-            # self.mixup_augment  = MixupAugment(img_size, trans_config)
-
+        if mosaic_augment:
+            self.mosaic_prob = 1.0
+            self.mixup_prob = 0.15
+            self.mosaic_augment = MosaicAugment(img_size)
+            self.mixup_augment  = MixupAugment(img_size)
+        else:
+            self.mosaic_prob = 0.0
+            self.mixup_prob  = 0.0
+            self.mosaic_augment = None
+            self.mixup_augment  = None
+        print('==============================')
+        print('use Mosaic Augmentation: {}'.format(self.mosaic_prob))
+        print('use Mixup Augmentation: {}'.format(self.mixup_prob))
+    
     def __getitem__(self, index):
-        image, target = self.load_image_target(index)
+        if random.random() < self.mosaic_prob:
+            # load a mosaic image
+            mosaic = True
+            image, target = self.load_mosaic(index)
+        else:
+            mosaic = False
+            # load an image and target
+            image, target = self.load_image_target(index)
+
+        # MixUp
+        if random.random() < self.mixup_prob:
+            image, target = self.load_mixup(image, target)
 
         image, target, deltas = self.transform(image, target, mosaic=False)
         
@@ -53,8 +75,39 @@ class VOCDataset(data.Dataset):
     def __add__(self, other: data.Dataset) -> data.ConcatDataset:
         return super().__add__(other)
     
-    def load_image_target(self, index):
+    # ------------ Mosaic & Mixup ------------
+    def load_mosaic(self, index):
+        # ------------ Prepare 4 indexes of images ------------
+        ## Load 4x mosaic image
+        index_list = np.arange(index).tolist() + np.arange(index+1, len(self.ids)).tolist()
+        id1 = index
+        id2, id3, id4 = random.sample(index_list, 3)
+        indexs = [id1, id2, id3, id4]
 
+        ## Load images and targets
+        image_list = []
+        target_list = []
+        for index in indexs:
+            img_i, target_i = self.load_image_target(index)
+            image_list.append(img_i)
+            target_list.append(target_i)
+
+        # ------------ Mosaic augmentation ------------
+        image, target = self.mosaic_augment(image_list, target_list)
+
+        return image, target
+    
+    def load_mixup(self, origin_image, origin_target):
+        # ------------ Load a new image & target ------------
+        new_index = np.random.randint(0, len(self.ids))
+        new_image, new_target = self.load_mosaic(new_index)
+            
+        # ------------ Mixup augmentation ------------
+        image, target = self.mixup_augment(origin_image, origin_target, new_image, new_target)
+
+        return image, target
+    
+    def load_image_target(self, index):
         image, _ = self.pull_image(index)
         
         anno, _ = self.pull_anno(index)

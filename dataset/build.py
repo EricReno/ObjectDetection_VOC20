@@ -10,12 +10,13 @@ def build_dataset(args, is_train, transformer, image_set):
         print('Build Dataset: VOC ...')
         print('Dataset Class_names: {}'.format(args.class_names))
 
-    datasets = VOCDataset(is_train = is_train,
-                          data_dir = args.data_root,
-                          transform = transformer,
-                          image_set = image_set,
-                          voc_classes = args.class_names,
-                          mosaic_augment = False
+    datasets = VOCDataset(img_size       = args.image_size,
+                          is_train       = is_train,
+                          data_dir       = args.data_root,
+                          transform      = transformer,
+                          image_set      = image_set,
+                          voc_classes    = args.class_names,
+                          mosaic_augment = is_train
                           )
     return datasets
     

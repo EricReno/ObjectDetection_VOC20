@@ -9,7 +9,7 @@ def parse_args():
                         help='Enable CUDA for GPU acceleration.')   
 
     parser.add_argument('--num_workers',  
-                        default=16,
+                        default=1,
                         type=int,
                         help='Number of CPU threads to use during data loading.')             
     
