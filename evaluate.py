@@ -6,11 +6,19 @@ from model.build import build_yolo
 from dataset.build import build_transform, build_dataset
 
 def rescale_bboxes(bboxes, std_size, ratio):
-    bboxes[..., [0, 2]] /= ratio[0]
-    bboxes[..., [1, 3]] /= ratio[1]
-    
-    bboxes[..., [0, 2]] = np.clip(bboxes[..., [0, 2]], a_min=0., a_max=(std_size[0] / ratio[0]))
-    bboxes[..., [1, 3]] = np.clip(bboxes[..., [1, 3]], a_min=0., a_max=(std_size[1] / ratio[1]))
+    # rescale bboxes
+    if isinstance(ratio, float):
+        bboxes /= ratio
+        std_size[0] /= ratio
+        std_size[1] /= ratio
+    elif isinstance(ratio, list):
+        std_size[0] /= ratio[0]
+        std_size[1] /= ratio[1]
+        bboxes[..., [0, 2]] /= ratio[0]
+        bboxes[..., [1, 3]] /= ratio[1]
+        
+        bboxes[..., [0, 2]] = np.clip(bboxes[..., [0, 2]], a_min=0., a_max=(std_size[0] / ratio[0]))
+        bboxes[..., [1, 3]] = np.clip(bboxes[..., [1, 3]], a_min=0., a_max=(std_size[1] / ratio[1]))
 
     return bboxes
 
