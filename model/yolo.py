@@ -328,9 +328,8 @@ class YOLO(nn.Module):
         return outputs
 
 if __name__ == "__main__":
-    import time
     from thop import profile
-    parser, args = parse_args()
+    args = parse_args()
 
     if args.cuda and torch.cuda.is_available():
         device = torch.device('cuda')
@@ -342,6 +341,8 @@ if __name__ == "__main__":
     model = YOLO(device = device,
                  trainable= True,
                  backbone = args.backbone,
+                 neck = args.neck,
+                 fpn = args.fpn,
                  anchor_size = args.anchor_size,
                  num_classes = args.num_classes,
                  nms_threshold = args.nms_threshold,

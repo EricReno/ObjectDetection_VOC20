@@ -29,7 +29,7 @@ def parse_args():
     
     # Data augmentation
     parser.add_argument('--data_augment',
-                        default= 'ssd',
+                        default= 'yolo',
                         choices = ['ssd', 'yolo'],
                         help='List of data augmentation techniques applied during training.')
 
@@ -80,7 +80,7 @@ def parse_args():
 
     # Training settings
     parser.add_argument('--batch_size',
-                        default=64,
+                        default=56,
                         type=int,
                         help='Batch size used during training (per GPU).')
     
@@ -163,7 +163,7 @@ def parse_args():
     
     # Model checkpoint
     parser.add_argument('--model_weight_path',         
-                        default='yolo_darknet_53.pth',                
+                        default='None',                
                         type=str,
                         help='Path to the initial model weights.')
 

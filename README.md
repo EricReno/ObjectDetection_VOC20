@@ -41,11 +41,13 @@ https://arxiv.org/abs/2004.10934 (v4)
 ## Results:
 |TAG              |Size |mAP   |GFLOPs|Params|Pt_Size|FPS-3060|
 |:---:            |:---:|:---: |:---: |:---: |:---:  |:---:   |
-|Yolo_v4_CSPTiny     |512  |65.71%|  4.56|  2.39|  18.4M| 77.1141|
+|Yolo_v4_Tiny     |512  |      |  5.05|  2.73|  21.0M| 77.1141|
+
+|Yolo_v4_CSPTiny     |512  |65.71%|  4.75|  2.76|  21.0M| 77.1141|
 |Yolo_v4_CSPDarknet53|512  |75.71%|133.40| 57.43|   442M|  5.0489|
 
 <table>
-<tr><th>Yolo_v4_Tiny</th> <th>Yolo_v4_Darknet53</th></tr>
+<tr><th>Yolo_v4_Tiny</th> <th>Yolo_v4_CSPDarknet_Tiny</th></tr>
 <tr>
 <td>
     
@@ -71,7 +73,7 @@ https://arxiv.org/abs/2004.10934 (v4)
 |sofa       |0.771|
 |train      |0.753|
 |tvmonitor  |0.677|
-|mAP        |0.657|
+|mAP        |0.672|
 
 </td>
 <td>
@@ -99,7 +101,8 @@ https://arxiv.org/abs/2004.10934 (v4)
 |sofa       |0.862|
 |train      |0.832|
 |tvmonitor  |0.742|
-|mAP        |0.748|
+
+|mAP        |0.638|
 
 </td>
 </tr> 

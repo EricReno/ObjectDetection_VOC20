@@ -14,7 +14,8 @@ class VOCDataset(data.Dataset):
                  data_dir :str = None, 
                  transform = None,
                  image_set :list = [],
-                 voc_classes :list = []) -> None:
+                 voc_classes :list = [],
+                 mosaic_augment :bool = False) -> None:
         super().__init__()
 
         self.is_train = is_train
@@ -32,11 +33,17 @@ class VOCDataset(data.Dataset):
             rootpath = os.path.join(self.data_dir, 'VOC' + year)
             for line in open(os.path.join(rootpath, 'ImageSets', 'Main', name+'.txt')):
                 self.ids.append((rootpath, line.strip()))
+        
+        # if mosaic_augment:
+        #     self.mosaic_prob = 1.0
+        #     self.mixup_prob = 0.15
+            # self.mosaic_augment = MosaicAugment(img_size, trans_config, is_train) if self.mosaic_prob > 0. else None
+            # self.mixup_augment  = MixupAugment(img_size, trans_config)
 
     def __getitem__(self, index):
         image, target = self.load_image_target(index)
 
-        image, target, deltas = self.transform(image, target)
+        image, target, deltas = self.transform(image, target, mosaic=False)
         
         return image, target, deltas
     

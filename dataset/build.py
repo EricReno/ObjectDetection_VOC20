@@ -15,6 +15,7 @@ def build_dataset(args, is_train, transformer, image_set):
                           transform = transformer,
                           image_set = image_set,
                           voc_classes = args.class_names,
+                          mosaic_augment = False
                           )
     return datasets
     
