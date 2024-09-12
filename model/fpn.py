@@ -47,48 +47,53 @@ class FPN(nn.Module):
     
  
 class PaFPN(nn.Module):
-    def __init__(self, feat_dims, nblocks):
+    def __init__(self, feat_dims, depth, width):
         super(PaFPN, self).__init__()
 
         c3, c4, c5 = feat_dims
-        out_dim = feat_dims[0]
+        out_dim = round(width*256)
 
         # top down
-        self.reduce_layer_1 = Conv(c5, int(0.5*c5), k=1)
-        self.top_down_layer_1 = CSPBlock(in_dim = 2*c4,
-                                         out_dim = c4,
+        self.reduce_layer_1 = Conv(c5, round(width*512))
+        self.top_down_layer_1 = CSPBlock(in_dim = c4+round(width*512),
+                                         out_dim = round(width*512),
                                          expand_ratio = 0.5,
-                                         nblocks = nblocks,
+                                         nblocks = round(3*depth),
                                          shortcut = False
                                          )
         
-        self.reduce_layer_2 = Conv(c4, int(0.5*c4), k=1)
-        self.top_down_layer_2 = CSPBlock(in_dim = 2*c3,
-                                         out_dim = c3,
+        self.reduce_layer_2 = Conv(round(width*512), round(width*256))
+        self.top_down_layer_2 = CSPBlock(in_dim = c3+round(width*256),
+                                         out_dim = round(width*256),
                                          expand_ratio = 0.5,
-                                         nblocks = nblocks,
+                                         nblocks = round(3*depth),
                                          shortcut = False
                                          )
         
         # bottom up
-        self.reduce_layer_3 = Conv(c3, c3, k=3, p=1, s=2)
-        self.bottom_up_layer_1 = CSPBlock(in_dim = 2*c3,
-                                          out_dim = c4,
+
+
+        self.reduce_layer_3 = Conv(round(width*256), round(width*256), k=3, p=1, s=2)
+        self.bottom_up_layer_1 = CSPBlock(in_dim = 2*round(width*256),
+                                          out_dim = round(width*512),
                                           expand_ratio = 0.5,
-                                          nblocks = nblocks,
+                                          nblocks = round(3*depth),
                                           shortcut = False
                                           )
         
-        self.reduce_layer_4 = Conv(c4, c4, k=3, p=1, s=2)
-        self.bottom_up_layer_2 = CSPBlock(in_dim = 2*c4,
-                                          out_dim = c5,
+        self.reduce_layer_4 = Conv(round(width*512), round(width*512), k=3, p=1, s=2)
+        self.bottom_up_layer_2 = CSPBlock(in_dim = 2*round(width*512),
+                                          out_dim = round(width*1024),
                                           expand_ratio = 0.5,
-                                          nblocks = nblocks,
+                                          nblocks = round(3*depth),
                                           shortcut = False
                                           )
 
         self.out_layers = nn.ModuleList([
-                Conv(in_dim, out_dim, k=1) for in_dim in feat_dims])
+                Conv(in_dim, out_dim, k=1) for in_dim in [round(width*256), 
+                                                          round(width*512), 
+                                                          round(width*1024)]
+                     ])
         self.out_dim = [out_dim] * 3
     
     def forward(self, features):
@@ -122,16 +127,18 @@ class PaFPN(nn.Module):
         return out_feats_proj
 
 def build_fpn(backbone_cfg, fpn_cfg, feat_dims):
-    if backbone_cfg in ['cspdarknet_tiny', 'darknet_tiny']:
-        nblocks = 1
-    elif backbone_cfg in ['cspdarknet_53', 'darknet_53']:
-        nblocks = 3
+    if backbone_cfg == 'cspdarknet_n':  depth, width = 0.34, 0.25
+    elif backbone_cfg == 'cspdarknet_t':depth, width = 0.34, 0.375
+    elif backbone_cfg == 'cspdarknet_s':depth, width = 0.34, 0.50
+    elif backbone_cfg == 'cspdarknet_m':depth, width = 0.67, 0.75
+    elif backbone_cfg == 'cspdarknet_l':depth, width = 1.0, 1.0
+    elif backbone_cfg == 'cspdarknet_x':depth, width = 1.34, 1.25
 
     if fpn_cfg == 'fpn':
         fpn = FPN(feat_dims)
         feat_dims = fpn.out_dim
     elif fpn_cfg == 'pafpn':
-        fpn = PaFPN(feat_dims, nblocks)
+        fpn = PaFPN(feat_dims, depth, width)
         feat_dims = fpn.out_dim
 
     return fpn, feat_dims

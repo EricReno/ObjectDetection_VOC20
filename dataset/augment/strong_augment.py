@@ -2,6 +2,10 @@
 import cv2
 import random
 import numpy as np
+try:
+    from dataset.augment.yolo_augment import random_perspective
+except:
+    from yolo_augment import random_perspective
 
 # ------------------------- Strong augmentations -------------------------
 ## Mosaic Augmentation
@@ -77,7 +81,17 @@ class MosaicAugment(object):
 
         # random perspective
         mosaic_targets = np.concatenate([mosaic_labels[..., None], mosaic_bboxes], axis=-1)
-
+        mosaic_img, mosaic_targets = random_perspective(
+            mosaic_img,
+            mosaic_targets,
+            degrees     = 0.0,
+            translate   = 0.1,
+            scale       = [0.5, 1.5],
+            shear       = 0.0,
+            perspective = 0.0,
+            border=[-self.img_size//2, -self.img_size//2]
+            )
+        
         # target
         mosaic_target = {
             "boxes": mosaic_targets[..., 1:],

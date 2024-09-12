@@ -18,7 +18,8 @@ class VOCDataset(data.Dataset):
                  transform = None,
                  image_set :list = [],
                  voc_classes :list = [],
-                 mosaic_augment :bool = False) -> None:
+                 mosaic_augment :bool = False,
+                 mixup_augment : bool = False) -> None:
         super().__init__()
 
         self.is_train = is_train
@@ -37,16 +38,14 @@ class VOCDataset(data.Dataset):
             for line in open(os.path.join(rootpath, 'ImageSets', 'Main', name+'.txt')):
                 self.ids.append((rootpath, line.strip()))
         
-        if mosaic_augment:
-            self.mosaic_prob = 1.0
-            self.mixup_prob = 0.15
-            self.mosaic_augment = MosaicAugment(img_size)
-            self.mixup_augment  = MixupAugment(img_size)
-        else:
-            self.mosaic_prob = 0.0
-            self.mixup_prob  = 0.0
-            self.mosaic_augment = None
-            self.mixup_augment  = None
+        # 设置 mosaic 相关的参数
+        self.mosaic_prob = 1.0 if mosaic_augment else 0.0
+        self.mosaic_augment = MosaicAugment(img_size) if mosaic_augment else None
+
+        # 设置 mixup 相关的参数
+        self.mixup_prob = 0.15 if mixup_augment else 0.0
+        self.mixup_augment = MixupAugment(img_size) if mixup_augment else None
+
         print('==============================')
         print('use Mosaic Augmentation: {}'.format(self.mosaic_prob))
         print('use Mixup Augmentation: {}'.format(self.mixup_prob))

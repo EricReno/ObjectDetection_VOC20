@@ -7,8 +7,8 @@ from torch.utils.tensorboard import SummaryWriter
 from config import parse_args
 from evaluate import build_eval
 from model.build import build_yolo
+from utils.loss import build_loss
 from utils.flops import compute_flops
-from utils.criterion import build_loss
 from utils.optimizer import build_optimizer
 from utils.lr_scheduler import build_lambda_lr_scheduler
 from dataset.build import build_transform, build_dataset, build_dataloader
@@ -28,14 +28,14 @@ def train():
     val_transformer = build_transform(args, is_train=False)
     train_transformer = build_transform(args, is_train=True)
 
-    val_dataset = build_dataset(args, False, val_transformer, args.val_dataset)
-    train_dataset = build_dataset(args, True, train_transformer, args.train_dataset)
+    val_dataset = build_dataset(args, is_train=False, transformer=val_transformer)
+    train_dataset = build_dataset(args, True, train_transformer, )
     train_dataloader = build_dataloader(args, train_dataset)
 
     model = build_yolo(args, device, True)
     compute_flops(model, args.image_size, device)
           
-    criterion =  build_loss(args, device)
+    loss_function =  build_loss(args, device)
     
     evaluator = build_eval(args, val_dataset, device)
     
@@ -63,13 +63,13 @@ def train():
                     x['lr'] = numpy.interp(epoch*len(train_dataloader)+iteration,
                                            [0, args.warmup_epochs*len(train_dataloader)],
                                            [0.1 if j == 0 else 0.0, x['initial_lr'] * lf(epoch)])
-                  
+            
             ## forward
             images = images.to(device)
             outputs = model(images)
 
             ## loss
-            loss_dict = criterion(outputs=outputs, targets=targets)
+            loss_dict = loss_function(outputs=outputs, targets=targets)
             [loss_obj, loss_cls, loss_box, losses] = loss_dict.values()
             if args.grad_accumulate > 1:
                losses /= args.grad_accumulate

@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
-from model.utils import Conv
+try:
+    from model.utils import Conv
+except:
+    from utils import Conv
 
 class SPPF(nn.Module):
     def __init__(self, in_dim, out_dim, expand_ratio=0.5, pooling_size=5, act_type='lrelu', norm_type='BN'):

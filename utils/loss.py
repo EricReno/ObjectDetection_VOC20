@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 
-class Loss(object):
+class YoloLoss(object):
     def __init__(self, 
                  device, 
                  num_classes,
@@ -66,7 +66,7 @@ class Loss(object):
             for (fmp_h, fmp_w) in feature_size
             ]
         gt_boxes =  [
-            torch.zeros([batch_size, fmp_h, fmp_w, self.boxes_per_cell, 4]) 
+            torch.zeros([batch_size, fmp_h, fmp_w, self.boxes_per_cell, 4])
             for (fmp_h, fmp_w) in feature_size
             ]
 
@@ -148,9 +148,6 @@ class Loss(object):
 
         return loss_obj
     
-    def loss_no_objectness(self, pred_obj):
-        return torch.square(pred_obj)
-    
     def loss_classes(self, pred_cls, gt_cls):
         loss_cls = F.binary_cross_entropy_with_logits(pred_cls, gt_cls, reduction='none')
 
@@ -220,7 +217,7 @@ class Loss(object):
         )
     
 def build_loss(args, device):
-    loss =  Loss(device = device,
+    loss =  YoloLoss(device = device,
                  anchor_size = args.anchor_size,
                  num_classes = args.num_classes,
                  boxes_per_cell = args.boxes_per_cell,

@@ -4,20 +4,28 @@ from .utils import CollateFunc
 from .augment.ssd_augment import SSDAugmentation
 from .augment.yolo_augment import YOLOAugmentation
 
-def build_dataset(args, is_train, transformer, image_set):
-    if not is_train :
+def build_dataset(args, is_train, transformer):
+    if is_train :
         print('==============================')
         print('Build Dataset: VOC ...')
         print('Dataset Class_names: {}'.format(args.class_names))
-
-    datasets = VOCDataset(img_size       = args.image_size,
-                          is_train       = is_train,
-                          data_dir       = args.data_root,
-                          transform      = transformer,
-                          image_set      = image_set,
-                          voc_classes    = args.class_names,
-                          mosaic_augment = is_train
-                          )
+        datasets = VOCDataset(img_size       = args.image_size,
+                              is_train       = True,
+                              data_dir       = args.data_root,
+                              transform      = transformer,
+                              image_set      = args.train_dataset,
+                              voc_classes    = args.class_names,
+                              mosaic_augment = args.mosaic,
+                              mixup_augment = args.mix_up
+                              )
+    else:
+        datasets = VOCDataset(img_size       = args.image_size,
+                              is_train       = False,
+                              data_dir       = args.data_root,
+                              transform      = transformer,
+                              image_set      = args.val_dataset,
+                              voc_classes    = args.class_names,
+                              )
     return datasets
     
 def build_transform(args, is_train):

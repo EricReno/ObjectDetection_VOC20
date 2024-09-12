@@ -32,13 +32,20 @@ def parse_args():
                         default= 'yolo',
                         choices = ['ssd', 'yolo'],
                         help='List of data augmentation techniques applied during training.')
+    parser.add_argument('--mosaic',
+                        default= True,
+                        type=bool)
+    parser.add_argument('--mix_up',
+                        default= False,
+                        type=bool)
 
     # Model settings
     parser.add_argument('--backbone', 
-                        default='darknet_tiny',
+                        default='cspdarknet_s',
                         type=str,
-                        choices=['darknet_53', 'darknet_tiny',
-                                 'cspdarknet_53', 'cspdarknet_tiny'],
+                        choices=['cspdarknet_n', 'cspdarknet_t', 'cspdarknet_s', 
+                                 'cspdarknet_l', 'cspdarknet_m', 'cspdarknet_x'
+                                 ],
                         help='Backbone network architecture.')
     parser.add_argument('--neck', 
                         default='sppf',
@@ -80,12 +87,12 @@ def parse_args():
 
     # Training settings
     parser.add_argument('--batch_size',
-                        default=56,
+                        default=64,
                         type=int,
                         help='Batch size used during training (per GPU).')
     
     parser.add_argument('--epochs_total',
-                        default=160,
+                        default=300,
                         type=int,
                         help='Total number of training epochs.')
     
@@ -101,8 +108,8 @@ def parse_args():
     
     # Optimizer settings
     parser.add_argument('--optimizer',             
-                        default='sgd',
-                        type=str,
+                        default='adamw',
+                        choices=['adamw', 'sgd'],
                         help='Base learning rate.')
     
     parser.add_argument('--lr_scheduler',             
@@ -115,7 +122,7 @@ def parse_args():
                         help='gradient accumulation')
     
     parser.add_argument('--learning_rate',             
-                        default=0.01,
+                        default=0.001,
                         type=float,
                         help='Base learning rate.')
     
@@ -125,7 +132,7 @@ def parse_args():
                         help='Momentum factor for SGD optimizer.')
     
     parser.add_argument('--weight_decay',
-                        default=0.0005,
+                        default=0.05,
                         type=float,
                         help='Weight decay factor for regularization.')
     

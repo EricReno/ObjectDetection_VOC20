@@ -10,9 +10,9 @@ sys.path.append(pro_path)
 
 from config import parse_args
 from model.head import Decouple
-from model.neck import build_neck
+# from model.neck import build_neck
 from model.fpn import build_fpn
-from model.backbone.darknet import build_backbone
+from model.darknet import build_backbone
 
 class YOLO(nn.Module):
     def __init__(self, 
@@ -42,7 +42,7 @@ class YOLO(nn.Module):
         self.backbone, feat_dims = build_backbone(backbone, pretrained=trainable)
         
         # SPP --> only last one
-        self.neck = build_neck(neck, feat_dims[-1])
+        # self.neck = build_neck(neck, feat_dims[-1])
 
         # 特征金字塔
         self.fpn, feat_dims = build_fpn(backbone, fpn, feat_dims)
@@ -222,7 +222,7 @@ class YOLO(nn.Module):
     def inference(self, x):
         pyramid_feats = self.backbone(x) 
 
-        pyramid_feats[-1] = self.neck(pyramid_feats[-1])
+        # pyramid_feats[-1] = self.neck(pyramid_feats[-1])
 
         pyramid_feats = self.fpn(pyramid_feats) 
 
@@ -285,7 +285,7 @@ class YOLO(nn.Module):
 
             pyramid_feats = self.backbone(x) 
 
-            pyramid_feats[-1] = self.neck(pyramid_feats[-1])
+            # pyramid_feats[-1] = self.neck(pyramid_feats[-1])
 
             pyramid_feats = self.fpn(pyramid_feats) 
 
@@ -328,11 +328,13 @@ class YOLO(nn.Module):
         return outputs
 
 if __name__ == "__main__":
+    import time
     from thop import profile
     args = parse_args()
 
     if args.cuda and torch.cuda.is_available():
         device = torch.device('cuda')
+        print('cuda')
     else:
         device = torch.device('cpu')
 
@@ -350,8 +352,10 @@ if __name__ == "__main__":
                  confidence_threshold = args.confidence_threshold
                  ).to(device)
 
+    t0 = time.time()
     outputs = model(input)
-    print(model)
+    t1 = time.time()
+    print('Time:', t1-t0)
     
     flops, params = profile(model, inputs=(input, ), verbose=False)
     print('==============================')

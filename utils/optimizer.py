@@ -26,6 +26,8 @@ def build_optimizer(args, model, resume=None):
     # Build optimizer
     if args.optimizer == 'sgd':
         optimizer = torch.optim.SGD(param_dicts[0], lr=base_lr, momentum=args.momentum, weight_decay=0.0)
+    elif args.optimizer =='adamw':
+        optimizer = torch.optim.AdamW(param_dicts[0], lr=base_lr, weight_decay=0.0)
     else:
         raise NotImplementedError("Unknown optimizer: {}".format(args.optimizer))
     

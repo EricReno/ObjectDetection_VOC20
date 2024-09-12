@@ -1,4 +1,5 @@
 
+import math
 import torch
 
 def build_lambda_lr_scheduler(args, optimizer):
@@ -6,7 +7,11 @@ def build_lambda_lr_scheduler(args, optimizer):
     scheduler = args.lr_scheduler
 
     lrf = 0.01
-    if scheduler == 'linear':
+    # Cosine LR scheduler
+    if scheduler == 'cosine':
+        lf = lambda x: ((1 - math.cos(x * math.pi / epochs)) / 2) * (lrf - 1) + 1
+    # Linear LR scheduler
+    elif scheduler == 'linear':
         lf = lambda x: (1 - x / epochs) * (1.0 - lrf) + lrf
     else:
         print('unknown lr scheduler.')

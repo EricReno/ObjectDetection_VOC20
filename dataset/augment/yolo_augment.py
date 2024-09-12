@@ -148,22 +148,6 @@ class YOLOAugmentation(object):
             target["boxes"] = boxes_
 
         if self.is_train:
-            # --------------- Spatial augmentations ---------------
-            ## Random perspective
-            # if not mosaic:
-            target_ = np.concatenate(
-                (target['labels'][..., None], target['boxes']), axis=-1)
-            img, target_ = random_perspective(
-                img, target_,
-                degrees     = 0.0,
-                translate   = 0.1,
-                scale       = [0.5, 1.5],
-                shear       = 0.0,
-                perspective = 0.0
-                )
-            target['boxes'] = target_[..., 1:]
-            target['labels'] = target_[..., 0]
-
             # --------------- Filter bad targets ---------------
             tgt_boxes_wh = target["boxes"][..., 2:] - target["boxes"][..., :2]
             min_tgt_size = np.min(tgt_boxes_wh, axis=-1)
@@ -176,6 +160,22 @@ class YOLOAugmentation(object):
 
             # --------------- HSV augmentations ---------------
             augment_hsv(img)
+
+            # --------------- Spatial augmentations ---------------
+            ## Random perspective
+            if not mosaic:
+                target_ = np.concatenate(
+                    (target['labels'][..., None], target['boxes']), axis=-1)
+                img, target_ = random_perspective(
+                    img, target_,
+                    degrees     = 0.0,
+                    translate   = 0.1,
+                    scale       = [0.5, 1.5],
+                    shear       = 0.0,
+                    perspective = 0.0
+                    )
+                target['boxes'] = target_[..., 1:]
+                target['labels'] = target_[..., 0]
                     
         # --------------- To torch.Tensor ---------------
         img_tensor = torch.from_numpy(img).permute(2, 0, 1).contiguous().float()
