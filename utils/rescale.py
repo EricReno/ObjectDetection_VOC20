@@ -1,6 +1,6 @@
 import torch
 
-def refine_targets(self, targets, min_box_size):
+def refine_targets(targets, min_box_size):
     # rescale targets
     for tgt in targets:
         boxes = tgt["boxes"].clone()

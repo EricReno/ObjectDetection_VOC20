@@ -41,22 +41,13 @@ https://arxiv.org/abs/2004.10934 (v4)
 ## Results:
 
 |Backbone    |Size |Params|FLOPs |Speedcpu|Model  |Params|FLOPs |
-|:---:       |:---:|:---: |:---: |:---:   |:---:  |
+|:---:       |:---:|:---: |:---: |:---:   |:---:  |:---: |:---: |
 |cspdarknet_n|512  | 0.89M| 1.82G| 43.96ms|Yolov5n| 2.26M| 4.48G|
 |cspdarknet_t|512  | 2.00M| 3.88G| 48.63ms|Yolov5t| 5.05M| 9.82G|
 |cspdarknet_s|512  | 3.56M| 6.72G| 63.03ms|Yolov5s| 8.96M|17.22G|
 |cspdarknet_m|512  |10.88M|20.79G|117.68ms|Yolov5m|25.32M|47.32G|
 |cspdarknet_l|512  |24.45M|47.37G|214.03ms|Yolov5l|54.20M|99.82G|
 |cspdarknet_x|512  |46.20M|90.49G|366.54ms|Yolov5x|99.06M|180.73G|
-
-
-
-
-|TAG              |Size |mAP   |GFLOPs|Params|Pt_Size|FPS-3060|
-|:---:            |:---:|:---: |:---: |:---: |:---:  |:---:   |
-|Yolo_v4_Tiny     |512  |      |  5.05|  2.73|  21.0M| 77.1141|
-|Yolo_v4_CSPTiny     |512  |65.71%|  4.75|  2.76|  21.0M| 77.1141|
-|Yolo_v4_CSPDarknet53|512  |75.71%|133.40| 57.43|   442M|  5.0489|
 
 <table>
 <tr><th>Yolo_v4_Tiny</th> <th>Yolo_v4_CSPDarknet_Tiny</th></tr>
