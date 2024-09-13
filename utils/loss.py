@@ -121,13 +121,13 @@ class YoloLoss(object):
     
     def decode_gt(self, targets, strides, feature_size):
         batch_size = len(targets)
-        gt_objes = [torch.zeros([batch_size, fmp_h, fmp_w, self.boxes_per_cell, 1])
+        gt_objectness = [torch.zeros([batch_size, fmp_h, fmp_w, self.boxes_per_cell, 1])
             for (fmp_h, fmp_w) in feature_size
             ]
         gt_classes = [torch.zeros([batch_size, fmp_h, fmp_w, self.boxes_per_cell, self.num_classes]) 
             for (fmp_h, fmp_w) in feature_size
             ]
-        gt_boxes =  [
+        gt_bboxes =  [
             torch.zeros([batch_size, fmp_h, fmp_w, self.boxes_per_cell, 4])
             for (fmp_h, fmp_w) in feature_size
             ]
@@ -136,12 +136,12 @@ class YoloLoss(object):
             target_cls = target['labels'].numpy()
             target_box = target['boxes'].numpy()
 
-            for box, label in zip(target_box, target_cls):
-                x1, y1, x2, y2 = box
+            for gt_box, label in zip(target_box, target_cls):
+                x1, y1, x2, y2 = gt_box
 
                 xc, yc = (x2 + x1) * 0.5, (y2 + y1) * 0.5
                 bw, bh = x2 - x1, y2 - y1
-                box = [0, 0, bw, bh]
+                gt_box = np.array([[0., 0., bw, bh]])
 
                 # check
                 if bw < 1. or bh < 1.:
@@ -183,25 +183,25 @@ class YoloLoss(object):
                         is_valid = (j >= 0 and j < fmp_h) and (i >= 0 and i < fmp_w)
                         if is_in_box and is_valid:
                             # obj
-                            gt_objes[level][batch_index, j, i, anchor_idx] = 1.0
+                            gt_objectness[level][batch_index, j, i, anchor_idx] = 1.0
 
                             # cls
                             cls_ont_hot = torch.zeros(self.num_classes)
                             cls_ont_hot[int(label)] = 1.0
                             gt_classes[level][batch_index, j, i, anchor_idx] = cls_ont_hot
                             # box
-                            gt_boxes[level][batch_index, j, i, anchor_idx] = torch.as_tensor([x1, y1, x2, y2])
+                            gt_bboxes[level][batch_index, j, i, anchor_idx] = torch.as_tensor([x1, y1, x2, y2])
 
 
-        gt_obj = torch.cat([gt.view(batch_size, -1, 1) for gt in gt_objes], dim=1)
-        gt_box = torch.cat([gt.view(batch_size, -1, 4) for gt in gt_boxes], dim=1).float().to(self.device)
-        gt_cls = torch.cat([gt.view(batch_size, -1, self.num_classes) for gt in gt_classes], dim=1).float().to(self.device)
+        gt_objectness = torch.cat([gt.view(batch_size, -1, 1) for gt in gt_objectness], dim=1)
+        gt_bboxes = torch.cat([gt.view(batch_size, -1, 4) for gt in gt_bboxes], dim=1).float().to(self.device)
+        gt_classes = torch.cat([gt.view(batch_size, -1, self.num_classes) for gt in gt_classes], dim=1).float().to(self.device)
 
-        gt_obj = gt_obj.view(-1).float().to(self.device)               # [BM,]
-        gt_cls = gt_cls.view(-1, self.num_classes).float().to(self.device)  # [BM, C]
-        gt_box = gt_box.view(-1, 4).float().to(self.device) 
+        gt_objectness = gt_objectness.view(-1).float().to(self.device)               # [BM,]
+        gt_classes = gt_classes.view(-1, self.num_classes).float().to(self.device)  # [BM, C]
+        gt_bboxes = gt_bboxes.view(-1, 4).float().to(self.device) 
 
-        return gt_obj, gt_cls, gt_box
+        return gt_objectness, gt_classes, gt_bboxes
 
     def loss_objectness(self, pred_obj, gt_obj):
         loss_obj = F.binary_cross_entropy_with_logits(pred_obj, gt_obj, reduction='none')

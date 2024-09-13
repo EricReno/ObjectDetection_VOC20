@@ -9,7 +9,7 @@ def parse_args():
                         help='Enable CUDA for GPU acceleration.')   
 
     parser.add_argument('--num_workers',  
-                        default=1,
+                        default=16,
                         type=int,
                         help='Number of CPU threads to use during data loading.')             
     
@@ -120,7 +120,7 @@ def parse_args():
     
     # Training settings
     parser.add_argument('--batch_size',
-                        default=64,
+                        default=32,
                         type=int,
                         help='Batch size used during training (per GPU).')
     
