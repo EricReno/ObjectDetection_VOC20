@@ -13,7 +13,7 @@ def parse_args():
                         type=int,
                         help='Number of CPU threads to use during data loading.')             
     
-    # Dataset settings
+    # Data settings
     parser.add_argument('--data_root',
                         default='/data/VOCdevkit',
                         type=str,
@@ -27,7 +27,6 @@ def parse_args():
                         default=[('2007', 'test')],
                         help='Dataset split used for validation (format: [(year, split)]).')
     
-    # Data augmentation
     parser.add_argument('--data_augment',
                         default= 'yolo',
                         choices = ['ssd', 'yolo'],
@@ -38,6 +37,10 @@ def parse_args():
     parser.add_argument('--mix_up',
                         default= False,
                         type=bool)
+    parser.add_argument('--min_box_size', 
+                        default=8.0, 
+                        type=float,
+                        help='min size of target bounding box.')
 
     # Model settings
     parser.add_argument('--backbone', 
@@ -84,7 +87,37 @@ def parse_args():
                         default=3,
                         type=int,
                         help='Number of bounding boxes predicted per cell.')
-
+    
+    parser.add_argument('--bbox_loss_weight',
+                        default=5.0,
+                        type=float,
+                        help='Weight for bounding box regression loss.')
+    
+    parser.add_argument('--objectness_loss_weight',
+                        default=1.0,
+                        type=float,
+                        help='Weight for objectness loss.')
+    
+    parser.add_argument('--class_loss_weight',
+                        default=1.0,
+                        type=float,
+                        help='Weight for classification loss.')
+    
+    parser.add_argument('--nms_threshold',
+                        default=0.5,
+                        type=float,
+                        help='Threshold for non-maximum suppression (NMS).')
+    
+    parser.add_argument('--confidence_threshold',
+                        default=0.3,
+                        type=float,
+                        help='Confidence threshold for filtering detections.')
+    
+    parser.add_argument('--recall_threshold',
+                        default=101,
+                        type=int,
+                        help='Threshold for recall evaluation.')
+    
     # Training settings
     parser.add_argument('--batch_size',
                         default=64,
@@ -106,7 +139,14 @@ def parse_args():
                         type=int,
                         help='Epoch interval to save model checkpoints.')
     
-    # Optimizer settings
+    parser.add_argument('--ema', 
+                        default=True,
+                        help='Model EMA')
+    
+    parser.add_argument('--multi_scale', 
+                        default=False,
+                        help='Multi scale')
+    
     parser.add_argument('--optimizer',             
                         default='adamw',
                         choices=['adamw', 'sgd'],
@@ -135,38 +175,6 @@ def parse_args():
                         default=0.05,
                         type=float,
                         help='Weight decay factor for regularization.')
-    
-     # Loss settings
-    parser.add_argument('--bbox_loss_weight',
-                        default=5.0,
-                        type=float,
-                        help='Weight for bounding box regression loss.')
-    
-    parser.add_argument('--objectness_loss_weight',
-                        default=1.0,
-                        type=float,
-                        help='Weight for objectness loss.')
-    
-    parser.add_argument('--class_loss_weight',
-                        default=1.0,
-                        type=float,
-                        help='Weight for classification loss.')
-    
-    # Thresholds
-    parser.add_argument('--nms_threshold',
-                        default=0.5,
-                        type=float,
-                        help='Threshold for non-maximum suppression (NMS).')
-    
-    parser.add_argument('--confidence_threshold',
-                        default=0.3,
-                        type=float,
-                        help='Confidence threshold for filtering detections.')
-    
-    parser.add_argument('--recall_threshold',
-                        default=101,
-                        type=int,
-                        help='Threshold for recall evaluation.')
     
     # Model checkpoint
     parser.add_argument('--model_weight_path',         

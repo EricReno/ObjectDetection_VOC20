@@ -18,8 +18,9 @@ class YoloLoss(object):
         self.anchor_size = anchor_size
         self.boxes_per_cell = boxes_per_cell
         self.bbox_loss_weight = bbox_loss_weight
-        self.objectness_loss_weight = objectness_loss_weight
         self.class_loss_weight = class_loss_weight
+        self.objectness_loss_weight = objectness_loss_weight
+        self.anchor_sizes = np.array([[anchor[0], anchor[1]] for anchor in anchor_size])
         self.anchor_boxes = np.array([[0., 0., anchor[0], anchor[1]] for anchor in anchor_size])  
     
     def compute_iou(self, anchor_boxes, gt_box):
@@ -57,12 +58,73 @@ class YoloLoss(object):
         
         return iou
     
+    def iou_assignment(self, ctr_points, gt_box, strides):
+         # compute IoU
+        iou = self.compute_iou(self.anchor_boxes, gt_box)
+        iou_mask = (iou > 0.5) # iou_threshold = 0.5
+
+        label_assignment_results = []
+        if iou_mask.sum() == 0:
+            iou_ind = np.argmax(iou)
+
+            level = iou_ind // 3             # pyramid level
+            anchor_idx = iou_ind - level * 3
+
+            stride = strides[level]
+
+            # compute the grid cell
+            xc, yc = ctr_points
+            xc_s = xc / stride
+            yc_s = yc / stride
+            grid_x = int(xc_s)
+            grid_y = int(yc_s)
+
+            label_assignment_results.append([grid_x, grid_y, xc_s, yc_s, level, anchor_idx])
+        else:
+            for iou_ind, iou_m in enumerate(iou_mask):
+                if iou_m:
+                    level = iou_ind // 3              # pyramid level
+                    anchor_idx = iou_ind - level * 3  # anchor index
+
+                    stride = strides[level]
+
+                    xc, yc = ctr_points
+                    xc_s = xc / stride
+                    yc_s = yc / stride
+                    grid_x = int(xc_s)
+                    grid_y = int(yc_s)
+
+                    label_assignment_results.append([grid_x, grid_y, xc_s, yc_s, level, anchor_idx])
+
+        return label_assignment_results
+
+    def aspect_ratio_assignment(self, ctr_points, keeps, fpn_strides):
+        label_assignment_results = []
+        for keep_idx, keep in enumerate(keeps):
+            if keep:
+                level = keep_idx // 3              # pyramid level
+                anchor_idx = keep_idx - level * 3  # anchor index
+
+                # get the corresponding stride
+                stride = fpn_strides[level]
+
+                # compute the gride cell
+                xc, yc = ctr_points
+                xc_s = xc / stride
+                yc_s = yc / stride
+                grid_x = int(xc_s)
+                grid_y = int(yc_s)
+
+                label_assignment_results.append([grid_x, grid_y, xc_s, yc_s, level, anchor_idx])
+        
+        return label_assignment_results
+    
     def decode_gt(self, targets, strides, feature_size):
         batch_size = len(targets)
         gt_objes = [torch.zeros([batch_size, fmp_h, fmp_w, self.boxes_per_cell, 1])
             for (fmp_h, fmp_w) in feature_size
             ]
-        gt_clses = [torch.zeros([batch_size, fmp_h, fmp_w, self.boxes_per_cell, self.num_classes]) 
+        gt_classes = [torch.zeros([batch_size, fmp_h, fmp_w, self.boxes_per_cell, self.num_classes]) 
             for (fmp_h, fmp_w) in feature_size
             ]
         gt_boxes =  [
@@ -85,57 +147,55 @@ class YoloLoss(object):
                 if bw < 1. or bh < 1.:
                     continue 
 
-                # compute IoU
-                iou = self.compute_iou(self.anchor_boxes, box)
-                iou_mask = (iou > 0.5) # iou_threshold = 0.5
+                # compute aspect ratio
+                ratios = gt_box[..., 2:] / self.anchor_sizes
+                keeps = np.maximum(ratios, 1 / ratios).max(-1) < 4.0
 
-                label_assignment_results = []
-                if iou_mask.sum() == 0:
-                    iou_ind = np.argmax(iou)
-
-                    level = iou_ind // 3             # pyramid level
-                    anchor_idx = iou_ind - level * 3
-
-                    stride = strides[level]
-
-                    # compute the grid cell
-                    xc_s = xc / stride
-                    yc_s = yc / stride
-                    grid_x = int(xc_s)
-                    grid_y = int(yc_s)
-
-                    label_assignment_results.append([grid_x, grid_y, level, anchor_idx])
+                if keeps.sum == 0:
+                    label_assignment_results = self.iou_assignment([xc, yc], gt_box, strides)
                 else:
-                    for iou_ind, iou_m in enumerate(iou_mask):
-                        if iou_m:
-                            level = iou_ind // 3              # pyramid level
-                            anchor_idx = iou_ind - level * 3  # anchor index
-
-                            stride = strides[level]
-
-                            xc_s = xc / stride
-                            yc_s = yc / stride
-                            grid_x = int(xc_s)
-                            grid_y = int(yc_s)
-
-                            label_assignment_results.append([grid_x, grid_y, level, anchor_idx])
+                    label_assignment_results = self.aspect_ratio_assignment([xc, yc], keeps, strides)
 
                 for result in label_assignment_results:
-                    grid_x, grid_y, level, anchor_idx = result
+                    grid_x, grid_y, xc_s, yc_s, level, anchor_idx = result
+                    stride = strides[level]
                     fmp_h, fmp_w = feature_size[level]
 
-                    if grid_x < fmp_w and grid_y < fmp_h:
-                        gt_objes[level][batch_index, grid_y, grid_x, anchor_idx] = 1.0
+                    # coord on the feature
+                    x1s, y1s = x1 / stride, y1 / stride
+                    x2s, y2s = x2 / stride, y2 / stride
 
-                        cls_ont_hot = torch.zeros(self.num_classes)
-                        cls_ont_hot[int(label)] = 1.0
-                        gt_clses[level][batch_index, grid_y, grid_x, anchor_idx] = cls_ont_hot
-                        
-                        gt_boxes[level][batch_index, grid_y, grid_x, anchor_idx] = torch.tensor([x1, y1, x2, y2])
+                    # offset
+                    off_x = xc_s - grid_x
+                    off_y = yc_s - grid_y
+
+                    if off_x <= 0.5 and off_y <= 0.5:  # top left
+                        grids = [(grid_x-1, grid_y), (grid_x, grid_y-1), (grid_x, grid_y)]
+                    elif off_x > 0.5 and off_y <= 0.5: # top right
+                        grids = [(grid_x+1, grid_y), (grid_x, grid_y-1), (grid_x, grid_y)]
+                    elif off_x <= 0.5 and off_y > 0.5: # bottom left
+                        grids = [(grid_x-1, grid_y), (grid_x, grid_y+1), (grid_x, grid_y)]
+                    elif off_x > 0.5 and off_y > 0.5:  # bottom right
+                        grids = [(grid_x+1, grid_y), (grid_x, grid_y+1), (grid_x, grid_y)]
+
+                    for (i, j) in grids:
+                        is_in_box = (j >= y1s and j < y2s) and (i >= x1s and i < x2s)
+                        is_valid = (j >= 0 and j < fmp_h) and (i >= 0 and i < fmp_w)
+                        if is_in_box and is_valid:
+                            # obj
+                            gt_objes[level][batch_index, j, i, anchor_idx] = 1.0
+
+                            # cls
+                            cls_ont_hot = torch.zeros(self.num_classes)
+                            cls_ont_hot[int(label)] = 1.0
+                            gt_classes[level][batch_index, j, i, anchor_idx] = cls_ont_hot
+                            # box
+                            gt_boxes[level][batch_index, j, i, anchor_idx] = torch.as_tensor([x1, y1, x2, y2])
+
 
         gt_obj = torch.cat([gt.view(batch_size, -1, 1) for gt in gt_objes], dim=1)
         gt_box = torch.cat([gt.view(batch_size, -1, 4) for gt in gt_boxes], dim=1).float().to(self.device)
-        gt_cls = torch.cat([gt.view(batch_size, -1, self.num_classes) for gt in gt_clses], dim=1).float().to(self.device)
+        gt_cls = torch.cat([gt.view(batch_size, -1, self.num_classes) for gt in gt_classes], dim=1).float().to(self.device)
 
         gt_obj = gt_obj.view(-1).float().to(self.device)               # [BM,]
         gt_cls = gt_cls.view(-1, self.num_classes).float().to(self.device)  # [BM, C]

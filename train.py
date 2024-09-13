@@ -7,10 +7,12 @@ from torch.utils.tensorboard import SummaryWriter
 from config import parse_args
 from evaluate import build_eval
 from model.build import build_yolo
+from utils.ema import ModelEMA
 from utils.loss import build_loss
 from utils.flops import compute_flops
 from utils.optimizer import build_optimizer
 from utils.lr_scheduler import build_lambda_lr_scheduler
+from utils.rescale import refine_targets, rescale_image_targets
 from dataset.build import build_transform, build_dataset, build_dataloader
 
 def train():
@@ -47,6 +49,11 @@ def train():
         optimizer.step()
         lr_scheduler.step()
     
+    if args.ema:
+        model_ema = ModelEMA(model, start_epoch * len(train_dataloader))
+    else:
+        model_ema = None
+
     # ----------------------- Train --------------------------------
     print('==============================')
     max_mAP = 0
@@ -64,8 +71,15 @@ def train():
                                            [0, args.warmup_epochs*len(train_dataloader)],
                                            [0.1 if j == 0 else 0.0, x['initial_lr'] * lf(epoch)])
             
-            ## forward
             images = images.to(device)
+             # Multi scale
+            if args.multi_scale:
+                images, targets, img_size = rescale_image_targets(
+                    images, targets, [8, 16, 32], args.min_box_size, args.multi_scale)
+            else:
+                targets = refine_targets(targets, args.min_box_size)
+
+            ## forward
             outputs = model(images)
 
             ## loss
@@ -82,6 +96,9 @@ def train():
             if ni % args.grad_accumulate == 0:
                 optimizer.step()
                 optimizer.zero_grad()
+                # ema
+                if model_ema is not None:
+                   model_ema.update(model)
 
             ## log
             print("Time [{}], Epoch [{}:{}/{}:{}], lr: {:.5f}, Loss: {:8.4f}, Loss_obj: {:8.4f}, Loss_cls: {:6.3f}, Loss_box: {:6.3f}".format(time.strftime('%H:%M:%S', time.gmtime(time.time()- start)), 
@@ -93,21 +110,23 @@ def train():
         train_loss /= len(train_dataloader.dataset)
         writer.add_scalar('Loss/Train', train_loss, epoch)
 
-        model.eval()
+        # chech model
+        model_eval = model if model_ema is None else model_ema.ema
+        model_eval.eval()
+        model_eval.trainable = False
         # save_model
         if epoch >= args.save_checkpoint_epoch:
-            model.trainable = False
             ckpt_path = os.path.join(os.getcwd(), 'log', '{}.pth'.format(epoch))
-            if not os.path.exists(os.path.dirname(ckpt_path)): 
+            if not os.path.exists(os.path.dirname(ckpt_path)):
                 os.makedirs(os.path.dirname(ckpt_path))
             
             with torch.no_grad():
-                mAP = evaluator.eval(model)
+                mAP = evaluator.eval(model_eval)
             writer.add_scalar('mAP', mAP, epoch)
 
             if mAP > max_mAP:
                 torch.save({
-                        'model': model.state_dict(),
+                        'model': model_eval.state_dict(),
                         'optimizer': optimizer.state_dict(),
                         'mAP':mAP,
                         'epoch': epoch,
