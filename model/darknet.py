@@ -90,11 +90,11 @@ class CSPDarkNet(nn.Module):
 
 # ImageNet-1K pretrained weight
 model_urls = {
-    "cspdarknet_n": "https://github.com/yjh0410/image_classification_pytorch/releases/download/weight/cspdarknet_nano.pth",
-    "cspdarknet_t": None,  # For Medium-level, it is not necessary to load pretrained weight.
-    "cspdarknet_s": "https://github.com/yjh0410/image_classification_pytorch/releases/download/weight/cspdarknet_small.pth",
-    "cspdarknet_m": None,  # For Medium-level, it is not necessary to load pretrained weight.
-    "cspdarknet_l": None,  # For Large-level,  it is not necessary to load pretrained weight.
+    "cspdarknet_n": "https://github.com/EricReno/Yolo_v5/releases/download/weights/cspdarknet_nano.pth",
+    "cspdarknet_t": "https://github.com/EricReno/Yolo_v5/releases/download/weights/cspdarknet_tiny.pth",
+    "cspdarknet_s": "https://github.com/EricReno/Yolo_v5/releases/download/weights/cspdarknet_small.pth",
+    "cspdarknet_m": "https://github.com/EricReno/Yolo_v5/releases/download/weights/cspdarknet_medium.pth",
+    "cspdarknet_l": "https://github.com/EricReno/Yolo_v5/releases/download/weights/cspdarknet_large.pth",
     "cspdarknet_x": None,  # For Huge-level,   it is not necessary to load pretrained weight.
 }
 

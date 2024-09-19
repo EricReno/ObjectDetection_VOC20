@@ -111,7 +111,7 @@ def parse_args():
     parser.add_argument('--eval_ovthresh',
                         default=0.5,
                         type=float,
-                        help='Threshold for non-maximum suppression (NMS).')
+                        help='Iou_Threshold for gt and dets.')
     
     parser.add_argument('--confidence_threshold',
                         default=0.001,
@@ -125,7 +125,7 @@ def parse_args():
     
     # Training settings
     parser.add_argument('--batch_size',
-                        default=64,
+                        default=8,
                         type=int,
                         help='Batch size used during training (per GPU).')
     
@@ -183,12 +183,12 @@ def parse_args():
     
     # Model checkpoint
     parser.add_argument('--model_weight_path',         
-                        default='yolov5_s_best.pth',                
+                        default='None',             
                         type=str,
                         help='Path to the initial model weights.')
 
     parser.add_argument('--resume_weight_path',         
-                        default='yolov5_s_best.pth',                
+                        default='None',          
                         type=str,
                         help='Path to the checkpoint from which to resume training.')
     
