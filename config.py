@@ -62,7 +62,7 @@ def parse_args():
                         help='Feature Pyramid Network (FPN) architecture.')
     
     parser.add_argument('--image_size',
-                        default=512,
+                        default=640,
                         type=int,
                         help='Input image size.')
     
@@ -104,12 +104,17 @@ def parse_args():
                         help='Weight for classification loss.')
     
     parser.add_argument('--nms_threshold',
+                        default=0.7,
+                        type=float,
+                        help='Threshold for non-maximum suppression (NMS).')
+    
+    parser.add_argument('--eval_ovthresh',
                         default=0.5,
                         type=float,
                         help='Threshold for non-maximum suppression (NMS).')
     
     parser.add_argument('--confidence_threshold',
-                        default=0.3,
+                        default=0.001,
                         type=float,
                         help='Confidence threshold for filtering detections.')
     
@@ -120,7 +125,7 @@ def parse_args():
     
     # Training settings
     parser.add_argument('--batch_size',
-                        default=32,
+                        default=64,
                         type=int,
                         help='Batch size used during training (per GPU).')
     
@@ -178,12 +183,12 @@ def parse_args():
     
     # Model checkpoint
     parser.add_argument('--model_weight_path',         
-                        default='None',                
+                        default='yolov5_s_best.pth',                
                         type=str,
                         help='Path to the initial model weights.')
 
     parser.add_argument('--resume_weight_path',         
-                        default='None',                
+                        default='yolov5_s_best.pth',                
                         type=str,
                         help='Path to the checkpoint from which to resume training.')
     

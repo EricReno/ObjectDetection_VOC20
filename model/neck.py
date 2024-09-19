@@ -6,7 +6,7 @@ except:
     from utils import Conv
 
 class SPPF(nn.Module):
-    def __init__(self, in_dim, out_dim, expand_ratio=0.5, pooling_size=5, act_type='lrelu', norm_type='BN'):
+    def __init__(self, in_dim, out_dim, expand_ratio=0.5, pooling_size=5, act_type='silu', norm_type='BN'):
         super().__init__()
         inter_dim = int(in_dim * expand_ratio)
         self.out_dim = out_dim

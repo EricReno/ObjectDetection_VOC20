@@ -54,7 +54,7 @@ class PaFPN(nn.Module):
         out_dim = round(width*256)
 
         # top down
-        self.reduce_layer_1 = Conv(c5, round(width*512))
+        self.reduce_layer_1 = Conv(c5, round(width*512), act_type='silu', norm_type='BN')
         self.top_down_layer_1 = CSPBlock(in_dim = c4+round(width*512),
                                          out_dim = round(width*512),
                                          expand_ratio = 0.5,
@@ -62,7 +62,7 @@ class PaFPN(nn.Module):
                                          shortcut = False
                                          )
         
-        self.reduce_layer_2 = Conv(round(width*512), round(width*256))
+        self.reduce_layer_2 = Conv(round(width*512), round(width*256), act_type='silu', norm_type='BN')
         self.top_down_layer_2 = CSPBlock(in_dim = c3+round(width*256),
                                          out_dim = round(width*256),
                                          expand_ratio = 0.5,
@@ -71,9 +71,7 @@ class PaFPN(nn.Module):
                                          )
         
         # bottom up
-
-
-        self.reduce_layer_3 = Conv(round(width*256), round(width*256), k=3, p=1, s=2)
+        self.downsample_layer_1 = Conv(round(width*256), round(width*256), k=3, p=1, s=2, act_type='silu', norm_type='BN')
         self.bottom_up_layer_1 = CSPBlock(in_dim = 2*round(width*256),
                                           out_dim = round(width*512),
                                           expand_ratio = 0.5,
@@ -81,7 +79,7 @@ class PaFPN(nn.Module):
                                           shortcut = False
                                           )
         
-        self.reduce_layer_4 = Conv(round(width*512), round(width*512), k=3, p=1, s=2)
+        self.downsample_layer_2 = Conv(round(width*512), round(width*512), k=3, p=1, s=2, act_type='silu', norm_type='BN')
         self.bottom_up_layer_2 = CSPBlock(in_dim = 2*round(width*512),
                                           out_dim = round(width*1024),
                                           expand_ratio = 0.5,
@@ -90,7 +88,7 @@ class PaFPN(nn.Module):
                                           )
 
         self.out_layers = nn.ModuleList([
-                Conv(in_dim, out_dim, k=1) for in_dim in [round(width*256), 
+                Conv(in_dim, out_dim, k=1, act_type='silu', norm_type='BN') for in_dim in [round(width*256), 
                                                           round(width*512), 
                                                           round(width*1024)]
                      ])
@@ -111,11 +109,11 @@ class PaFPN(nn.Module):
         c8_ = self.top_down_layer_2(c8)
 
         # bottom up
-        c9 = self.reduce_layer_3(c8_)
+        c9 = self.downsample_layer_1(c8_)
         c9 = torch.cat([c9, c7], dim=1)
         c9_ = self.bottom_up_layer_1(c9)
 
-        c10 = self.reduce_layer_4(c9_)
+        c10 = self.downsample_layer_2(c9_)
         c10 = torch.cat([c10, c6], dim=1)
         c10_ = self.bottom_up_layer_2(c10)
 

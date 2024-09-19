@@ -181,7 +181,7 @@ class YOLOAugmentation(object):
         img_tensor = torch.from_numpy(img).permute(2, 0, 1).contiguous().float()
         if target is not None:
             target["boxes"] = torch.as_tensor(target["boxes"]).float()
-            target["labels"] = torch.as_tensor(target["labels"]).long()
+            target["labels"] = torch.as_tensor(target["labels"]).float()
 
         # --------------- Pad image ---------------
         img_h0, img_w0 = img_tensor.shape[1:]

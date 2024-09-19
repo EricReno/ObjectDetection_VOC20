@@ -47,7 +47,7 @@ class YOLO(nn.Module):
         # 特征金字塔
         self.fpn, feat_dims = build_fpn(backbone, fpn, feat_dims)
 
-        self.heads = nn.ModuleList(
+        self.non_shared_heads = nn.ModuleList(
             [Decouple(dim) for dim in feat_dims]
         )
         
@@ -111,7 +111,7 @@ class YOLO(nn.Module):
             将txtytwth转换为常用的x1y1x2y2形式。
         """
         # 计算预测边界框的中心点坐标和宽高
-        pred_ctr = (torch.sigmoid(reg_pred[..., :2]) + anchors[..., :2]) * self.stride[level]
+        pred_ctr = (torch.sigmoid(reg_pred[..., :2])*2.0 - 0.5 + anchors[..., :2]) * self.stride[level]
         pred_wh = torch.exp(reg_pred[..., 2:]) * anchors[..., 2:]
 
         # 将所有bbox的中心带你坐标和宽高换算成x1y1x2y2形式
@@ -124,11 +124,6 @@ class YOLO(nn.Module):
     ## basic NMS
     def nms(self, bboxes, scores, nms_thresh):
         """"Pure Python NMS."""
-        # 将所有bbox的中心带你坐标和宽高换算成x1y1x2y2形式
-        pred_x1y1 = bboxes[..., :2] - bboxes[..., 2:] * 0.5
-        pred_x2y2 = bboxes[..., :2] + bboxes[..., 2:] * 0.5
-        bboxes = np.concatenate([pred_x1y1, pred_x2y2], axis=-1)
-
         x1 = bboxes[:, 0]  #xmin
         y1 = bboxes[:, 1]  #ymin
         x2 = bboxes[:, 2]  #xmax
@@ -177,8 +172,13 @@ class YOLO(nn.Module):
             # [M, C] -> [MC,]
             scores_i = (torch.sqrt(obj_pred_i.sigmoid() * cls_pred_i.sigmoid())).flatten()
 
-            topk_scores, topk_idxs = scores_i.sort(descending=True)
+            # Keep top k top scoring indices only.
+            num_topk = min(1000, box_pred_i.size(0))
 
+            topk_scores, topk_idxs = scores_i.sort(descending=True)
+            topk_scores = topk_scores[:num_topk]
+            topk_idxs = topk_idxs[:num_topk]
+            
             keep_idxs = topk_scores > self.confidence_threshold
             scores = topk_scores[keep_idxs]
             topk_idxs = topk_idxs[keep_idxs]
@@ -226,13 +226,12 @@ class YOLO(nn.Module):
 
         pyramid_feats = self.fpn(pyramid_feats) 
 
-        
         all_anchors = []
         all_obj_preds = []
         all_cls_preds = []
         all_box_preds = []
 
-        for level, (feat, head) in enumerate(zip(pyramid_feats, self.heads)):
+        for level, (feat, head) in enumerate(zip(pyramid_feats, self.non_shared_heads)):
             cls_feat, reg_feat = head(feat)
 
             obj_pred = self.obj_preds[level](reg_feat)
@@ -268,7 +267,6 @@ class YOLO(nn.Module):
         else:
             bboxes, scores, labels = self.postprocess(
                 all_obj_preds, all_cls_preds, all_box_preds)
-
             outputs = {
                     "scores": scores,
                     "labels": labels,
@@ -293,7 +291,7 @@ class YOLO(nn.Module):
             all_obj_preds = []
             all_cls_preds = []
             all_box_preds = []
-            for level, (feat, head) in enumerate(zip(pyramid_feats, self.heads)):
+            for level, (feat, head) in enumerate(zip(pyramid_feats, self.non_shared_heads)):
                 cls_feat, reg_feat = head(feat)
 
                 obj_pred = self.obj_preds[level](reg_feat)

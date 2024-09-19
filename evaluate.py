@@ -5,20 +5,16 @@ from config import parse_args
 from model.build import build_yolo
 from dataset.build import build_transform, build_dataset
 
-def rescale_bboxes(bboxes, std_size, ratio):
+def rescale_bboxes(bboxes, origin_size, ratio):
     # rescale bboxes
     if isinstance(ratio, float):
         bboxes /= ratio
-        std_size[0] /= ratio
-        std_size[1] /= ratio
     elif isinstance(ratio, list):
-        std_size[0] /= ratio[0]
-        std_size[1] /= ratio[1]
         bboxes[..., [0, 2]] /= ratio[0]
         bboxes[..., [1, 3]] /= ratio[1]
         
-        bboxes[..., [0, 2]] = np.clip(bboxes[..., [0, 2]], a_min=0., a_max=(std_size[0] / ratio[0]))
-        bboxes[..., [1, 3]] = np.clip(bboxes[..., [1, 3]], a_min=0., a_max=(std_size[1] / ratio[1]))
+    bboxes[..., [0, 2]] = np.clip(bboxes[..., [0, 2]], a_min=0., a_max=origin_size[0])
+    bboxes[..., [1, 3]] = np.clip(bboxes[..., [1, 3]], a_min=0., a_max=origin_size[1])
 
     return bboxes
 
@@ -45,37 +41,49 @@ class Evaluator():
                               ] for _ in range(self.num_classes)]
         # all_det_boxes[cls][image] = N x 5 array of detections in (x1, y1, x2, y2, score)
 
-    def voc_ap(self, recall, precision):
-        """ 
-        Compute the average precision, given the recall and precision curves.
-        Code originally from https://github.com/rbgirshick/py-faster-rcnn.
+    # def voc_ap(self, recall, precision):
+    #     """ 
+    #     Compute the average precision, given the recall and precision curves.
+    #     Code originally from https://github.com/rbgirshick/py-faster-rcnn.
         
-        # Arguments
-            recall:    The recall curve (np.array).
-            precision: The precision curve (np.array).
-        # Returns
-            The average precision as computed in py-faster-rcnn.
-        """
+    #     # Arguments
+    #         recall:    The recall curve (np.array).
+    #         precision: The precision curve (np.array).
+    #     # Returns
+    #         The average precision as computed in py-faster-rcnn.
+    #     """
         
-        # first append sentinel values at the end
-        mrec = np.concatenate(([0.0], recall, [1.0]))
-        mpre = np.concatenate(([1.0], precision, [0.0]))
+    #     # first append sentinel values at the end
+    #     mrec = np.concatenate(([0.0], recall, [1.0]))
+    #     mpre = np.concatenate(([1.0], precision, [0.0]))
         
-        # compute the precision envelope
-        for i in range(mpre.size - 1, 0, -1):
-            mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
+    #     # compute the precision envelope
+    #     for i in range(mpre.size - 1, 0, -1):
+    #         mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
             
-        # where X axis (recall) changes value
-        i = np.where(mrec[:-1] != mrec[1:])[0]     
+    #     # where X axis (recall) changes value
+    #     i = np.where(mrec[:-1] != mrec[1:])[0]     
 
-        # and sum (\Delta recall) * prec
-        ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
+    #     # and sum (\Delta recall) * prec
+    #     ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
+    #     return ap
+    def voc_ap(self, rec, prec):
+        ap = 0.
+        for t in np.arange(0., 1.1, 0.1):
+            if np.sum(rec >= t) == 0:
+                p = 0
+            else:
+                p = np.max(prec[rec >= t])
+            ap = ap + p / 11.
         return ap
   
     def inference(self, model):
         # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         # video = cv2.VideoWriter('result.mp4', fourcc, 1, (int(1000*0.8), int(415*0.8)))
         for i in range(len(self.dataset)):
+            img, _ = self.dataset.pull_image(i)
+            orig_h, orig_w = img.shape[:2]
+
             image, target, deltas = self.dataset[i]
 
             image = image.unsqueeze(0).to(self.device)
@@ -86,7 +94,7 @@ class Evaluator():
             bboxes = outputs['bboxes']
 
             # rescale prediction bboxes
-            bboxes = rescale_bboxes(bboxes, list(image.shape[-2:]), deltas)
+            bboxes = rescale_bboxes(bboxes, [orig_w, orig_h], deltas)
             for j in range(self.num_classes):
                 inds = np.where(labels == j)[0]
                 if len(inds) == 0:
@@ -98,7 +106,7 @@ class Evaluator():
                 self.all_det_boxes[j][i] = c_dets
 
             # rescale grountruth targets
-            target['boxes'] = rescale_bboxes(target['boxes'], list(image.shape[-2:]), deltas)
+            target['boxes'] = rescale_bboxes(target['boxes'], [orig_w, orig_h], deltas)
             for j in range(self.num_classes):
                 inds = np.where((target['labels'] == j) | (target['labels'] == j+0.1))[0]
 
@@ -153,6 +161,7 @@ class Evaluator():
                     show_image = np.concatenate((groundtruth_image, prediction_image), axis=1)
                     cv2.imshow('1', show_image)
                     cv2.waitKey(0)
+                    cv2.destroyAllWindows()
                     # show_image = cv2.resize(show_image, (int(1000*0.8), int(415*0.8)))   
                     # video.write(show_image)
 
@@ -191,7 +200,7 @@ class Evaluator():
             for k in range(dets.shape[0]):
                 image_ids.append(image_id)
                 confidence.append(dets[k, -1])
-                bboxes.append([dets[k, 0], dets[k, 1], dets[k, 2], dets[k, 3]])
+                bboxes.append([dets[k, 0]+1, dets[k, 1]+1, dets[k, 2]+1, dets[k, 3]+1])
        
         return {
             'image_ids': np.array(image_ids),
@@ -239,11 +248,13 @@ class Evaluator():
 
                         max_iou, max_index = np.max(ious), np.argmax(ious)
 
-                        if max_iou > self.ovthresh and gt_dic['det'][max_index] != 1:
-                            tp[index] = 1
-                            gt_dic['det'][max_index] = 1
-                            gt_cls_ind = cls_ind  # 真实类别的索引
-                            det_cls_ind = cls_ind  # 检测到的类别索引
+                        if max_iou > self.ovthresh:
+                            if not gt_dic['difficult'][max_index]:
+                                if not gt_dic['det'][max_index]:
+                                    tp[index] = 1
+                                    gt_dic['det'][max_index] = 1
+                                else:
+                                    fp[index] = 1 
                         else:
                             fp[index] = 1 
                     else:
@@ -259,12 +270,14 @@ class Evaluator():
                 tp = np.nan_to_num(tp, nan=0.0)
                 fp = np.nan_to_num(fp, nan=0.0)
                 prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
+    
+                ap = self.voc_ap(rec, prec)
 
-                ## 插值的P-R曲线
-                rec_interp=np.linspace(0, 1, self.recall_thre) #101steps, from 0% to 100% 
-                prec = np.interp(rec_interp, rec, prec, right=0)
+                # ## 插值的P-R曲线
+                # rec_interp=np.linspace(0, 1, self.recall_thre) #101steps, from 0% to 100% 
+                # prec = np.interp(rec_interp, rec, prec, right=0)
 
-                ap = self.voc_ap(rec_interp, prec)
+                # ap = self.voc_ap(rec_interp, prec)
             else:
                 rec = 0.
                 prec = 0.
@@ -287,7 +300,7 @@ def build_eval(args, dataset, device):
     evaluator = Evaluator(
         device   =device,
         dataset  = dataset,
-        ovthresh = args.nms_threshold,                        
+        ovthresh = args.eval_ovthresh,                        
         class_names = args.class_names,
         recall_thre = args.recall_threshold,
         visualization = args.eval_visualization)
@@ -305,7 +318,7 @@ if __name__ == "__main__":
 
 
     val_transformer = build_transform(args, is_train=False)
-    val_dataset = build_dataset(args, False, val_transformer, args.val_dataset)
+    val_dataset = build_dataset(args, is_train=False, transformer=val_transformer)
 
 
     model = build_yolo(args, device, False)
@@ -316,6 +329,20 @@ if __name__ == "__main__":
                             map_location = 'cpu', 
                             weights_only = False)
     model.load_state_dict(state_dict["model"])
+
+    # model_state_dict = model.state_dict()
+    # # check
+    # for k in list(state_dict["model"].keys()):
+    #     if k in model_state_dict:
+    #         print(k)
+    #         shape_model = tuple(model_state_dict[k].shape)
+    #         shape_checkpoint = tuple(state_dict["model"][k].shape)
+    #         if shape_model != shape_checkpoint:
+    #             state_dict["model"].pop(k)
+    #     else:
+    #         state_dict["model"].pop(k)
+    #         print('Unused key: ', k)
+
     print('mAP:', state_dict['mAP'])
 
 
