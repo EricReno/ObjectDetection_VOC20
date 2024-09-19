@@ -1,4 +1,4 @@
-# Yolo_V5 (You only look once)
+# Yolo_v5 (You only look once)
 
 - Yolo_v5 pytorch源码，含训练、推理、评测、部署脚本
 - 细节请参考Yolo_v4论文描述：
@@ -6,13 +6,13 @@ https://arxiv.org/abs/2004.10934 (v4)
 
 ## Train Tricks
 
-|Epoch|BatchSize|Pretrain|WarmUp|Datasets|TrainSize|ValSize|Augment |
-|:---:|:---:    |:---:   |:---: |:---:   |:---:    |:---:  |:---:   |
-|300  |64       |CoCo    |3     |VOC20   |16553    |4952   |hsv+Ablu|
+|Epoch|BatchSize|Pretrain|WarmUp|Datasets|Train|Val  |Augment |Model_Ema|
+|:---:|:---:    |:---:   |:---: |:---:   |:---:|:---:|:---:   |:---:    |
+|300  |64       |CoCo    |3     |VOC20   |16553|4952 |hsv+Ablu|True     |
 
-|NMS_TH.|EvalIou_TH.|Confidence_TH.|Optimizer|Grad_accu|Lr_sche|LearningRate|Model_Ema|
-|:---:  |:---:      |:---:         |:---:    |:---:    |:---:  |:---:       |:---:    |
-|0.7    |0.5        |0.001         |adamw    |1        |linear |0.001       |True     |
+|NMS_TH.|EvalIou_TH.|Confidence_TH.|Optimizer|Grad_accu|Lr_sche|LearningRate|
+|:---:  |:---:      |:---:         |:---:    |:---:    |:---:  |:---:       |
+|0.7    |0.5        |0.001         |adamw    |1        |linear |0.001       |
 
 ## Results:
 
